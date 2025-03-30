@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 270 70% 50%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 270 30% 90%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 270 20% 90%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 270 50% 90%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 270 20% 85%;
+    --input: 270 20% 85%;
+    --ring: 270 70% 50%;
+    --radius: 0.5rem;
+
+    /* Couleurs papier calligraphie */
+    --calligraphy-paper: 270 10% 90%;
+    --calligraphy-paper-dark: 270 10% 10%;
+    --calligraphy-border: 270 20% 75%;
+    --calligraphy-border-dark: 270 20% 20%;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 210 40% 98%;
+    --card: 0 0% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 270 70% 50%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 270 30% 15%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 270 20% 15%;
+    --muted-foreground: 270 20% 70%;
+    --accent: 270 50% 15%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 270 20% 20%;
+    --input: 270 20% 20%;
+    --ring: 270 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Effet papier calligraphie */
+.bg-calligraphy-paper {
+  background-color: hsl(var(--calligraphy-paper));
+  position: relative;
+}
+
+.bg-calligraphy-paper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+  opacity: 0.5;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.dark .bg-calligraphy-paper {
+  background-color: hsl(var(--calligraphy-paper-dark));
+}
+
+.dark .bg-calligraphy-paper::before {
+  opacity: 0.2;
+}
+
+/* Vignette effect for paper edges */
+.paper-vignette {
+  position: relative;
+}
+
+.paper-vignette::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-shadow: inset 0 0 50px rgba(100, 50, 200, 0.15);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.dark .paper-vignette::after {
+  box-shadow: inset 0 0 50px rgba(100, 50, 200, 0.3);
+}
+
+/* Purple Background - without grid points/lines */
+.pyramid-grid {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(10, 10, 15, 0.95);
+  overflow: hidden;
+}
+
+.pyramid-grid::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  right: -50%;
+  bottom: -50%;
+  width: 200%;
+  height: 200%;
+  /* Grid lines removed */
+  background-color: rgba(64, 0, 128, 0.1);
+  transform: perspective(1000px) rotateX(60deg) scale(2.5, 3) translateZ(-100px);
+  transform-origin: center center;
+}
+
+.pyramid-grid::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(
+      circle at 50% 50%,
+      rgba(128, 0, 255, 0.1) 0%,
+      rgba(64, 0, 128, 0.2) 50%,
+      rgba(32, 0, 64, 0.3) 100%
+    ), linear-gradient(to bottom, transparent 0%, rgba(103, 58, 183, 0.2) 50%, rgba(81, 45, 168, 0.4) 100%);
+  pointer-events: none;
+}
+
+/* Enhanced dark mode styling */
+.dark .pyramid-grid::before {
+  background-color: rgba(81, 45, 168, 0.15);
+}
+
+.dark .pyramid-grid::after {
+  background: radial-gradient(
+      circle at 50% 50%,
+      rgba(170, 0, 255, 0.15) 0%,
+      rgba(128, 0, 255, 0.25) 50%,
+      rgba(64, 0, 128, 0.35) 100%
+    ), linear-gradient(to bottom, transparent 0%, rgba(149, 104, 244, 0.25) 50%, rgba(126, 87, 194, 0.45) 100%);
+}
+
