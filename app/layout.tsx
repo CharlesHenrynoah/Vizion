@@ -1,5 +1,6 @@
 import type React from "react"
 import ClientLayout from "./ClientLayout"
+import './globals.css'
 
 export const metadata = {
   title: 'Vizion',
@@ -16,10 +17,10 @@ export default function RootLayout({
 }>) {
   // Wrap ClientLayout with a div that explicitly disables shadows
   return (
-    <div className="shadow-none">
-      <ClientLayout>{children}</ClientLayout>
-    </div>
+    <html lang="en">
+      <body>
+        <ClientLayout>{children}</ClientLayout>
+      </body>
+    </html>
   );
 }
-
-import './globals.css'

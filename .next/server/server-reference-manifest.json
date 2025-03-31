@@ -1,5 +1,17 @@
 {
-  "node": {},
+  "node": {
+    "70f3d85758d4da1100f14c87eb155c02124b977086": {
+      "workers": {
+        "app/page": {
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fproject-actions.ts%22%2C%5B%5B%2270f3d85758d4da1100f14c87eb155c02124b977086%22%2C%22generateProjectDescription%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
+      }
+    }
+  },
   "edge": {},
   "encryptionKey": "FkjRixjL8MpLEs79wZr5l8buimHvIRHbe87Io3nC5tY="
 }
