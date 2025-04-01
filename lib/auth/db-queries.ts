@@ -11,25 +11,38 @@ const supabase = createClient(supabaseUrl, supabaseKey);
  */
 export async function verifyUserCredentials(email: string, password: string) {
   try {
+    console.log(`Attempting to verify credentials for email: ${email}`);
+    
     // Rechercher l'utilisateur par email
     const { data, error } = await supabase
       .from('users')
       .select('id, email, name, password, avatar')
       .eq('email', email)
-      .single();
+      .maybeSingle(); // Using maybeSingle instead of single to avoid errors when no user is found
+    
+    console.log('Database query result:', { data, error });
 
-    if (error || !data) {
-      console.error('Erreur lors de la recherche de l\'utilisateur:', error);
-      return null;
+    if (error) {
+      console.error('Error querying user:', error);
+      throw new Error('Database error during authentication');
+    }
+
+    if (!data) {
+      console.log('No user found with this email');
+      throw new Error('No user found with this email');
     }
 
     // Vérifier le mot de passe
+    console.log('Comparing passwords...');
     const passwordMatch = await compare(password, data.password);
+    console.log('Password match result:', passwordMatch);
+    
     if (!passwordMatch) {
-      return null;
+      throw new Error('Invalid credentials');
     }
 
     // Retourner les informations de l'utilisateur sans le mot de passe
+    console.log('Authentication successful for user:', data.email);
     return {
       id: data.id,
       email: data.email,
@@ -37,8 +50,11 @@ export async function verifyUserCredentials(email: string, password: string) {
       image: data.avatar
     };
   } catch (error) {
-    console.error('Erreur lors de la vérification des identifiants:', error);
-    return null;
+    console.error('Authentication error:', error);
+    if (error instanceof Error) {
+      throw error; // Propager l'erreur avec le message spécifique
+    }
+    throw new Error('Authentication failed');
   }
 }
 

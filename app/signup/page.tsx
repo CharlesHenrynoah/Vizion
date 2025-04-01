@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -26,14 +26,81 @@ export default function SignUpPage() {
     agreeToTerms: false
   });
 
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    agreeToTerms: ""
+  });
+
   // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
 
+  // Name validation regex - only letters, apostrophes, and hyphens
+  const nameRegex = /^[a-zA-ZÀ-ÿ'-]+$/;
+
+  // Email validation regex
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  // Password validation regex - at least 8 characters, 1 number, 1 symbol
+  const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])(?=.*[a-zA-Z]).{8,}$/;
+
+  // Validate form fields on change
+  useEffect(() => {
+    const newValidationErrors = { ...validationErrors };
+    
+    // First name validation
+    if (formData.firstName && !nameRegex.test(formData.firstName)) {
+      newValidationErrors.firstName = "Only letters, apostrophes (') and hyphens (-) are allowed";
+    } else {
+      newValidationErrors.firstName = "";
+    }
+    
+    // Last name validation
+    if (formData.lastName && !nameRegex.test(formData.lastName)) {
+      newValidationErrors.lastName = "Only letters, apostrophes (') and hyphens (-) are allowed";
+    } else {
+      newValidationErrors.lastName = "";
+    }
+    
+    // Email validation
+    if (formData.email && !emailRegex.test(formData.email)) {
+      newValidationErrors.email = "Please enter a valid email address";
+    } else {
+      newValidationErrors.email = "";
+    }
+    
+    // Password validation
+    if (formData.password && !passwordRegex.test(formData.password)) {
+      newValidationErrors.password = "Password must be at least 8 characters long and include a number and symbol";
+    } else {
+      newValidationErrors.password = "";
+    }
+    
+    // Password match validation
+    if (formData.confirmPassword && formData.password !== formData.confirmPassword) {
+      newValidationErrors.confirmPassword = "Passwords do not match";
+    } else {
+      newValidationErrors.confirmPassword = "";
+    }
+    
+    setValidationErrors(newValidationErrors);
+  }, [formData]);
+
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
+    
+    // For name fields, only allow valid characters
+    if ((name === 'firstName' || name === 'lastName') && value !== "" && !nameRegex.test(value)) {
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -46,6 +113,22 @@ export default function SignUpPage() {
       ...prev,
       agreeToTerms: checked
     }));
+  };
+
+  // Check if form is valid
+  const isFormValid = () => {
+    // Check if there are any validation errors
+    const hasValidationErrors = Object.values(validationErrors).some(error => error !== "");
+    
+    // Check if all required fields are filled
+    const allFieldsFilled = formData.firstName.trim() !== "" && 
+                           formData.lastName.trim() !== "" && 
+                           formData.email.trim() !== "" && 
+                           formData.password.trim() !== "" && 
+                           formData.confirmPassword.trim() !== "" && 
+                           formData.agreeToTerms;
+    
+    return !hasValidationErrors && allFieldsFilled;
   };
 
   // Handle form submission
@@ -86,11 +169,35 @@ export default function SignUpPage() {
         }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.message || "Failed to sign up");
       }
       
+      // Si le statut est 201 (Created), l'inscription a réussi
+      if (response.status === 201) {
+        console.log("User registered successfully:", data);
+        // Redirect to Kanban page after successful registration
+        router.push('/kanban');
+        return;
+      }
+      
+      // Si la réponse contient un champ success à false, c'est une erreur
+      if (data.success === false) {
+        // Handle specific errors from the API
+        if (data.error && data.error.includes("email already exists")) {
+          setValidationErrors(prev => ({
+            ...prev,
+            email: "This email is already registered"
+          }));
+          throw new Error("This email is already registered");
+        } else {
+          throw new Error(data.error || "Failed to sign up");
+        }
+      }
+      
+      // Si on arrive ici, c'est que tout s'est bien passé
       // Redirect to Kanban page after successful registration
       router.push('/kanban');
       
@@ -167,11 +274,14 @@ export default function SignUpPage() {
                           id="firstName"
                           name="firstName"
                           placeholder="John"
-                          className="bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md"
+                          className={`bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md ${validationErrors.firstName ? 'border-red-400' : ''}`}
                           value={formData.firstName}
                           onChange={handleChange}
                           disabled={isLoading}
                         />
+                        {validationErrors.firstName && (
+                          <p className="text-xs text-red-500 mt-1">{validationErrors.firstName}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="lastName" className="text-blue-300 font-medium text-sm">Last name</Label>
@@ -179,11 +289,14 @@ export default function SignUpPage() {
                           id="lastName"
                           name="lastName"
                           placeholder="Doe"
-                          className="bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md"
+                          className={`bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md ${validationErrors.lastName ? 'border-red-400' : ''}`}
                           value={formData.lastName}
                           onChange={handleChange}
                           disabled={isLoading}
                         />
+                        {validationErrors.lastName && (
+                          <p className="text-xs text-red-500 mt-1">{validationErrors.lastName}</p>
+                        )}
                       </div>
                     </div>
 
@@ -195,11 +308,14 @@ export default function SignUpPage() {
                         name="email"
                         type="email"
                         placeholder="john.doe@example.com"
-                        className="bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md"
+                        className={`bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md ${validationErrors.email ? 'border-red-400' : ''}`}
                         value={formData.email}
                         onChange={handleChange}
                         disabled={isLoading}
                       />
+                      {validationErrors.email && (
+                        <p className="text-xs text-red-500 mt-1">{validationErrors.email}</p>
+                      )}
                     </div>
 
                     {/* Password field */}
@@ -212,12 +328,15 @@ export default function SignUpPage() {
                         name="password"
                         type="password"
                         placeholder="••••••••"
-                        className="bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md"
+                        className={`bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md ${validationErrors.password ? 'border-red-400' : ''}`}
                         value={formData.password}
                         onChange={handleChange}
                         disabled={isLoading}
                       />
                       <p className="text-xs text-blue-300">Password must be at least 8 characters long and include a number and symbol</p>
+                      {validationErrors.password && (
+                        <p className="text-xs text-red-500 mt-1">{validationErrors.password}</p>
+                      )}
                     </div>
 
                     {/* Confirm Password field */}
@@ -228,11 +347,14 @@ export default function SignUpPage() {
                         name="confirmPassword"
                         type="password"
                         placeholder="••••••••"
-                        className="bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md"
+                        className={`bg-white text-blue-300 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md ${validationErrors.confirmPassword ? 'border-red-400' : ''}`}
                         value={formData.confirmPassword}
                         onChange={handleChange}
                         disabled={isLoading}
                       />
+                      {validationErrors.confirmPassword && (
+                        <p className="text-xs text-red-500 mt-1">{validationErrors.confirmPassword}</p>
+                      )}
                     </div>
 
                     {/* Terms checkbox */}
@@ -248,14 +370,24 @@ export default function SignUpPage() {
                         I agree to the <Link href="/terms" className="underline underline-offset-2 hover:text-blue-300 text-blue-400">Terms of Service</Link> and <Link href="/privacy" className="underline underline-offset-2 hover:text-blue-300 text-blue-400">Privacy Policy</Link>
                       </label>
                     </div>
+                    {validationErrors.agreeToTerms && (
+                      <p className="text-xs text-red-500 mt-1">{validationErrors.agreeToTerms}</p>
+                    )}
 
                     {/* Submit button */}
                     <Button 
                       type="submit" 
                       className="w-full bg-blue-400 hover:bg-blue-300 text-white font-medium py-2 rounded-md transition-all mt-4"
-                      disabled={!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.password.trim() || !formData.confirmPassword.trim() || !formData.agreeToTerms || isLoading}
+                      disabled={!isFormValid() || isLoading}
                     >
-                      {isLoading ? "Processing..." : "Sign up"}
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        "Sign up"
+                      )}
                     </Button>
                   </form>
                   

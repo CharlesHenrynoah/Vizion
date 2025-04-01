@@ -35,24 +35,28 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null;
+          throw new Error("Email and password are required");
         }
 
-        const user = await verifyUserCredentials(
-          credentials.email,
-          credentials.password
-        );
+        try {
+          const user = await verifyUserCredentials(
+            credentials.email,
+            credentials.password
+          );
 
-        if (!user) {
-          return null;
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          };
+        } catch (error) {
+          // Propager l'erreur avec le message spécifique
+          if (error instanceof Error) {
+            throw new Error(error.message);
+          }
+          throw new Error("Authentication failed");
         }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        };
       }
     })
   ],

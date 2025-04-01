@@ -11,20 +11,17 @@ export async function POST(request: Request) {
     // Validate the input data
     if (!email || !password) {
       return NextResponse.json(
-        { message: 'Email and password are required' },
+        { success: false, message: 'Email and password are required' },
         { status: 400 }
       );
     }
     
     // Authenticate the user
-    const result = await authenticateUser({
-      email,
-      password,
-    });
+    const result = await authenticateUser(email, password);
     
-    if (result.error) {
+    if (!result.success) {
       return NextResponse.json(
-        { message: result.error },
+        { success: false, message: result.error },
         { status: 401 }
       );
     }
@@ -36,28 +33,34 @@ export async function POST(request: Request) {
       { expiresIn: '7d' }
     );
     
-    // Set the token in a cookie
-    (await
-          // Set the token in a cookie
-          cookies()).set({
-      name: 'auth-token',
-      value: token,
+    // Create the response with the success data
+    const response = NextResponse.json(
+      { 
+        success: true, 
+        message: 'Login successful', 
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name
+        }
+      },
+      { status: 200 }
+    );
+    
+    // Set the cookie on the response object
+    response.cookies.set('auth-token', token, {
       httpOnly: true,
       path: '/',
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 7, // 1 week
     });
     
-    // Return success response
-    return NextResponse.json(
-      { message: 'Login successful', user: result.user },
-      { status: 200 }
-    );
+    return response;
     
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { message: 'An error occurred during login' },
+      { success: false, message: 'An error occurred during login' },
       { status: 500 }
     );
   }

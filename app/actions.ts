@@ -1,29 +1,14 @@
 "use server";
 
-import { neon, NeonQueryFunction } from "@neondatabase/serverless";
+import { createClient } from '@supabase/supabase-js';
 import { hash, compare } from "bcrypt";
 
-// Get the database URL from environment variables
-const databaseUrl = process.env.DATABASE_URL;
+// Créer le client Supabase avec les mêmes paramètres que NextAuth
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Initialize the SQL query function with proper type arguments
-let sql: NeonQueryFunction<false, false>;
-
-try {
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  
-  // Initialize the Neon client
-  sql = neon(databaseUrl);
-  console.log("Neon SQL client initialized successfully");
-} catch (error) {
-  console.error("Failed to initialize Neon SQL client:", error);
-  // Provide a fallback non-functional SQL function
-  sql = (async () => { 
-    throw new Error("Database connection not available"); 
-  }) as unknown as NeonQueryFunction<false, false>;
-}
+console.log("Supabase client initialized successfully");
 
 /**
  * Fetch data from the database
@@ -33,26 +18,20 @@ try {
  */
 export async function getData(table = "users", limit = 10) {
   try {
-    // Pour éviter les problèmes de SQL injection, nous utilisons une approche simplifiée
-    // Notez que dans un environnement de production, il faudrait utiliser une méthode plus sécurisée
-    let query;
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .limit(limit);
     
-    if (table === "users") {
-      query = await sql`SELECT * FROM users LIMIT ${limit}`;
-    } else if (table === "projects") {
-      query = await sql`SELECT * FROM projects LIMIT ${limit}`;
-    } else {
-      throw new Error(`Table ${table} not supported`);
+    if (error) {
+      console.error(`Error fetching data from ${table}:`, error);
+      return [];
     }
     
-    return { success: true, data: query };
+    return data || [];
   } catch (error) {
-    console.error(`Error fetching data from ${table}:`, error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Unknown database error",
-      data: [] 
-    };
+    console.error("Database query error:", error);
+    return [];
   }
 }
 
@@ -64,24 +43,21 @@ export async function getData(table = "users", limit = 10) {
  */
 export async function getRecordById(table: string, id: number) {
   try {
-    let results;
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .eq('id', id)
+      .single();
     
-    if (table === "users") {
-      results = await sql`SELECT * FROM users WHERE id = ${id} LIMIT 1`;
-    } else if (table === "projects") {
-      results = await sql`SELECT * FROM projects WHERE id = ${id} LIMIT 1`;
-    } else {
-      throw new Error(`Table ${table} not supported`);
+    if (error) {
+      console.error(`Error fetching record from ${table}:`, error);
+      return null;
     }
     
-    return { success: true, data: results[0] || null };
+    return data;
   } catch (error) {
-    console.error(`Error fetching ${table} with ID ${id}:`, error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Unknown database error",
-      data: null 
-    };
+    console.error("Database query error:", error);
+    return null;
   }
 }
 
@@ -102,8 +78,21 @@ export async function createUser({ firstName, lastName, email, password }: {
 }) {
   try {
     // Check if user already exists
-    const existingUser = await sql`SELECT id FROM users WHERE email = ${email} LIMIT 1`;
-    if (existingUser.length > 0) {
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .limit(1);
+    
+    if (checkError) {
+      console.error("Error checking existing user:", checkError);
+      return { 
+        success: false, 
+        error: "Database error when checking user" 
+      };
+    }
+    
+    if (existingUser && existingUser.length > 0) {
       return { 
         success: false, 
         error: "User with this email already exists" 
@@ -117,22 +106,40 @@ export async function createUser({ firstName, lastName, email, password }: {
     const name = `${firstName} ${lastName}`;
     
     // Insert the new user
-    const result = await sql`
-      INSERT INTO users (email, password, name, created_at, updated_at, is_active)
-      VALUES (${email}, ${hashedPassword}, ${name}, NOW(), NOW(), true)
-      RETURNING id, email, name, created_at, is_active
-    `;
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert([
+        { 
+          email, 
+          password: hashedPassword, 
+          name, 
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          is_active: true
+        }
+      ])
+      .select()
+      .single();
     
+    if (insertError) {
+      console.error("Error creating user:", insertError);
+      return { 
+        success: false, 
+        error: "Failed to create user account" 
+      };
+    }
+    
+    // Return success with user data (excluding password)
+    const { password: _, ...userWithoutPassword } = newUser;
     return { 
       success: true, 
-      user: result[0],
-      message: "User created successfully" 
+      user: userWithoutPassword
     };
   } catch (error) {
     console.error("Error creating user:", error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : "Unknown error during user creation" 
+      error: "An unexpected error occurred" 
     };
   }
 }
@@ -145,46 +152,56 @@ export async function createUser({ firstName, lastName, email, password }: {
  */
 export async function authenticateUser(email: string, password: string) {
   try {
-    // Find the user by email
-    const users = await sql`
-      SELECT id, email, password, name, created_at
-      FROM users
-      WHERE email = ${email}
-      LIMIT 1
-    `;
+    console.log(`Authenticating user with email: ${email}`);
     
-    if (users.length === 0) {
+    // Get user by email
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Database error during authentication:", error);
       return { 
         success: false, 
-        error: "Invalid email or password" 
+        error: "Database error during authentication" 
       };
     }
     
-    const user = users[0];
-    
-    // Compare the provided password with the stored hash
-    const passwordMatch = await compare(password, user.password);
-    
-    if (!passwordMatch) {
+    if (!data) {
+      console.log("No user found with this email");
       return { 
         success: false, 
-        error: "Invalid email or password" 
+        error: "User not found. Please check your email or sign up for a new account." 
       };
     }
     
-    // Don't return the password hash
-    const { password: _, ...userWithoutPassword } = user;
+    // Compare passwords
+    console.log("Comparing passwords...");
+    const passwordValid = await compare(password, data.password);
+    console.log("Password match result:", passwordValid);
+    
+    if (!passwordValid) {
+      return { 
+        success: false, 
+        error: "Incorrect password. Please try again." 
+      };
+    }
+    
+    // Return user data without password
+    const { password: _, ...userWithoutPassword } = data;
+    console.log("Authentication successful for user:", data.email);
     
     return { 
       success: true, 
-      data: userWithoutPassword,
-      message: "Authentication successful" 
+      user: userWithoutPassword
     };
   } catch (error) {
     console.error("Authentication error:", error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : "Unknown authentication error" 
+      error: "An error occurred during authentication" 
     };
   }
 }
