@@ -19,8 +19,10 @@ try {
   console.log("Neon SQL client initialized successfully");
 } catch (error) {
   console.error("Failed to initialize Neon SQL client:", error);
-  // Provide a fallback non-functional SQL function to prevent runtime errors
-  sql = (() => Promise.reject(new Error("Database connection not available"))) as NeonQueryFunction<false, false>;
+  // Provide a fallback non-functional SQL function
+  sql = (async () => { 
+    throw new Error("Database connection not available"); 
+  }) as unknown as NeonQueryFunction<false, false>;
 }
 
 /**
@@ -31,12 +33,19 @@ try {
  */
 export async function getData(table = "users", limit = 10) {
   try {
-    // Use parameterized query to prevent SQL injection
-    const data = await sql`
-      SELECT * FROM ${sql(table)} 
-      LIMIT ${limit}
-    `;
-    return { success: true, data };
+    // Pour éviter les problèmes de SQL injection, nous utilisons une approche simplifiée
+    // Notez que dans un environnement de production, il faudrait utiliser une méthode plus sécurisée
+    let query;
+    
+    if (table === "users") {
+      query = await sql`SELECT * FROM users LIMIT ${limit}`;
+    } else if (table === "projects") {
+      query = await sql`SELECT * FROM projects LIMIT ${limit}`;
+    } else {
+      throw new Error(`Table ${table} not supported`);
+    }
+    
+    return { success: true, data: query };
   } catch (error) {
     console.error(`Error fetching data from ${table}:`, error);
     return { 
@@ -55,11 +64,16 @@ export async function getData(table = "users", limit = 10) {
  */
 export async function getRecordById(table: string, id: number) {
   try {
-    const results = await sql`
-      SELECT * FROM ${sql(table)} 
-      WHERE id = ${id}
-      LIMIT 1
-    `;
+    let results;
+    
+    if (table === "users") {
+      results = await sql`SELECT * FROM users WHERE id = ${id} LIMIT 1`;
+    } else if (table === "projects") {
+      results = await sql`SELECT * FROM projects WHERE id = ${id} LIMIT 1`;
+    } else {
+      throw new Error(`Table ${table} not supported`);
+    }
+    
     return { success: true, data: results[0] || null };
   } catch (error) {
     console.error(`Error fetching ${table} with ID ${id}:`, error);
@@ -73,12 +87,19 @@ export async function getRecordById(table: string, id: number) {
 
 /**
  * Create a new user
- * @param {string} email - User email
- * @param {string} password - User password (will be hashed)
- * @param {string} name - User name
+ * @param {Object} userData - User data object
+ * @param {string} userData.firstName - User first name
+ * @param {string} userData.lastName - User last name
+ * @param {string} userData.email - User email
+ * @param {string} userData.password - User password (will be hashed)
  * @returns {Promise<object>} Result object with success status and user data or error
  */
-export async function createUser(email: string, password: string, name: string) {
+export async function createUser({ firstName, lastName, email, password }: { 
+  firstName: string; 
+  lastName: string; 
+  email: string; 
+  password: string; 
+}) {
   try {
     // Check if user already exists
     const existingUser = await sql`SELECT id FROM users WHERE email = ${email} LIMIT 1`;
@@ -92,16 +113,19 @@ export async function createUser(email: string, password: string, name: string) 
     // Hash the password before storing
     const hashedPassword = await hash(password, 10);
     
+    // Combine first and last name
+    const name = `${firstName} ${lastName}`;
+    
     // Insert the new user
     const result = await sql`
-      INSERT INTO users (email, password, name, created_at)
-      VALUES (${email}, ${hashedPassword}, ${name}, NOW())
-      RETURNING id, email, name, created_at
+      INSERT INTO users (email, password, name, created_at, updated_at, is_active)
+      VALUES (${email}, ${hashedPassword}, ${name}, NOW(), NOW(), true)
+      RETURNING id, email, name, created_at, is_active
     `;
     
     return { 
       success: true, 
-      data: result[0],
+      user: result[0],
       message: "User created successfully" 
     };
   } catch (error) {

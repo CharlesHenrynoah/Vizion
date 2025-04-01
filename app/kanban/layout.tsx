@@ -1,14 +1,23 @@
-import type { ReactNode } from "react"
+import { ReactNode } from "react"
 import { ProjectSidebar } from "@/components/project-sidebar"
 
-export default function KanbanLayout({ children }: { children: ReactNode }) {
+// Ce layout est utilisé uniquement pour la page Kanban
+// Il n'inclut ni header ni footer
+export const metadata = {
+  title: "Vizion AI - Project Board",
+}
+
+export default function KanbanLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="min-h-screen flex bg-gradient-to-b from-white via-blue-100 to-blue-200 bg-fixed">
       <ProjectSidebar />
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full w-full max-w-full px-4 py-4">{children}</div>
-      </div>
+      <main className="flex-1 ml-64 p-6">
+        {children}
+      </main>
     </div>
   )
 }
-

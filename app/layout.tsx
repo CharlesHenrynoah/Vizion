@@ -1,10 +1,9 @@
 import type React from "react"
-import ClientLayout from "./ClientLayout"
 import './globals.css'
 
 export const metadata = {
-  title: 'Vizion',
-  description: 'Your Vizion app description',
+  title: 'Vizion AI',
+  description: 'Your Vizion AI app description',
   icons: {
     icon: '/favicon.ico',
   }
@@ -15,11 +14,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // Wrap ClientLayout with a div that explicitly disables shadows
   return (
     <html lang="en">
       <body>
-        <ClientLayout>{children}</ClientLayout>
+        {children}
       </body>
     </html>
   );

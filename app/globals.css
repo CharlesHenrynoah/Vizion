@@ -10,26 +10,26 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 270 70% 50%;
+    --primary: 210 70% 60%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 270 30% 90%;
+    --secondary: 210 30% 90%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 270 20% 90%;
+    --muted: 210 20% 90%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 270 50% 90%;
+    --accent: 210 50% 90%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 270 20% 85%;
-    --input: 270 20% 85%;
-    --ring: 270 70% 50%;
+    --border: 210 20% 85%;
+    --input: 210 20% 85%;
+    --ring: 210 70% 60%;
     --radius: 0.5rem;
 
     /* Couleurs papier calligraphie */
-    --calligraphy-paper: 270 10% 90%;
-    --calligraphy-paper-dark: 270 10% 10%;
-    --calligraphy-border: 270 20% 75%;
-    --calligraphy-border-dark: 270 20% 20%;
+    --calligraphy-paper: 40 30% 90%;
+    --calligraphy-paper-dark: 40 10% 10%;
+    --calligraphy-border: 40 20% 75%;
+    --calligraphy-border-dark: 40 20% 20%;
   }
 
   .dark {
@@ -39,19 +39,19 @@
     --card-foreground: 210 40% 98%;
     --popover: 0 0% 9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 270 70% 50%;
+    --primary: 210 70% 60%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 270 30% 15%;
+    --secondary: 210 30% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 270 20% 15%;
-    --muted-foreground: 270 20% 70%;
-    --accent: 270 50% 15%;
+    --muted: 210 20% 15%;
+    --muted-foreground: 210 20% 70%;
+    --accent: 210 50% 15%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 270 20% 20%;
-    --input: 270 20% 20%;
-    --ring: 270 70% 50%;
+    --border: 210 20% 20%;
+    --input: 210 20% 20%;
+    --ring: 210 70% 60%;
   }
 }
 
@@ -103,21 +103,21 @@
   left: 0;
   width: 100%;
   height: 100%;
-  box-shadow: inset 0 0 50px rgba(100, 50, 200, 0.15);
+  box-shadow: inset 0 0 50px rgba(50, 100, 200, 0.15);
   z-index: 1;
   pointer-events: none;
 }
 
 .dark .paper-vignette::after {
-  box-shadow: inset 0 0 50px rgba(100, 50, 200, 0.3);
+  box-shadow: inset 0 0 50px rgba(50, 100, 200, 0.3);
 }
 
-/* Purple Background - without grid points/lines */
+/* Beige Background - without grid points/lines */
 .pyramid-grid {
   position: absolute;
   width: 100%;
   height: 100%;
-  background-color: rgba(10, 10, 15, 0.95);
+  background-color: rgba(15, 15, 10, 0.95);
   overflow: hidden;
 }
 
@@ -131,7 +131,7 @@
   width: 200%;
   height: 200%;
   /* Grid lines removed */
-  background-color: rgba(64, 0, 128, 0.1);
+  background-color: rgba(200, 180, 150, 0.1);
   transform: perspective(1000px) rotateX(60deg) scale(2.5, 3) translateZ(-100px);
   transform-origin: center center;
 }
@@ -145,24 +145,23 @@
   bottom: 0;
   background: radial-gradient(
       circle at 50% 50%,
-      rgba(128, 0, 255, 0.1) 0%,
-      rgba(64, 0, 128, 0.2) 50%,
-      rgba(32, 0, 64, 0.3) 100%
-    ), linear-gradient(to bottom, transparent 0%, rgba(103, 58, 183, 0.2) 50%, rgba(81, 45, 168, 0.4) 100%);
+      rgba(200, 180, 150, 0.1) 0%,
+      rgba(180, 160, 130, 0.2) 50%,
+      rgba(160, 140, 110, 0.3) 100%
+    ), linear-gradient(to bottom, transparent 0%, rgba(200, 180, 150, 0.2) 50%, rgba(180, 160, 130, 0.4) 100%);
   pointer-events: none;
 }
 
 /* Enhanced dark mode styling */
 .dark .pyramid-grid::before {
-  background-color: rgba(81, 45, 168, 0.15);
+  background-color: rgba(150, 130, 100, 0.15);
 }
 
 .dark .pyramid-grid::after {
   background: radial-gradient(
       circle at 50% 50%,
-      rgba(170, 0, 255, 0.15) 0%,
-      rgba(128, 0, 255, 0.25) 50%,
-      rgba(64, 0, 128, 0.35) 100%
-    ), linear-gradient(to bottom, transparent 0%, rgba(149, 104, 244, 0.25) 50%, rgba(126, 87, 194, 0.45) 100%);
+      rgba(200, 180, 150, 0.15) 0%,
+      rgba(180, 160, 130, 0.25) 50%,
+      rgba(160, 140, 110, 0.35) 100%
+    ), linear-gradient(to bottom, transparent 0%, rgba(200, 180, 150, 0.25) 50%, rgba(180, 160, 130, 0.45) 100%);
 }
-

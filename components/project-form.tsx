@@ -488,7 +488,7 @@ export function ProjectForm() {
       <CardContent className="p-0">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="project-name" className="text-white font-medium">
+            <Label htmlFor="project-name" className="text-blue-400 font-medium">
               Project Name
             </Label>
             <Input
@@ -496,12 +496,12 @@ export function ProjectForm() {
               placeholder="ChatApp"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              className="bg-black/20 text-white border-purple-800/30 focus:ring-1 focus:ring-purple-500 focus:outline-none rounded-md"
+              className="bg-white text-blue-400 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="inspirations" className="text-white font-medium">
+            <Label htmlFor="inspirations" className="text-blue-400 font-medium">
               Inspirations
             </Label>
             <Input
@@ -510,12 +510,12 @@ export function ProjectForm() {
               value={inspirations}
               onChange={(e) => setInspirations(e.target.value)}
               required
-              className="bg-black/20 text-white border-purple-800/30 focus:ring-1 focus:ring-purple-500 focus:outline-none rounded-md"
+              className="bg-white text-blue-400 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="project-goal" className="text-white font-medium">
+            <Label htmlFor="project-goal" className="text-blue-400 font-medium">
               Project Purpose
             </Label>
             <Textarea
@@ -525,14 +525,14 @@ export function ProjectForm() {
               onChange={handleProjectGoalChange}
               required
               maxLength={MAX_CHARS}
-              className={`min-h-[100px] bg-black/20 text-white border-purple-800/30 focus:ring-1 focus:ring-purple-500 focus:outline-none rounded-md ${
+              className={`min-h-[100px] bg-white text-blue-400 border-blue-400/30 focus:ring-1 focus:ring-blue-400 focus:outline-none rounded-md ${
                 isAtCharLimit ? "opacity-90" : ""
               }`}
             />
             <div className="flex justify-between items-center">
               <p
                 className={`text-xs ${
-                  isAtCharLimit ? "text-green-500 font-medium" : "text-slate-400"
+                  isAtCharLimit ? "text-green-500 font-medium" : "text-blue-400"
                 }`}
               >
                 {projectGoal.length}/{MAX_CHARS} characters
@@ -540,7 +540,7 @@ export function ProjectForm() {
               <Button
                 type="button"
                 size="sm"
-                className={`bg-purple-600 hover:bg-purple-500 text-white flex items-center gap-1 px-2 py-1 h-7 text-xs rounded-md ${!inspirations.trim() ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`bg-blue-400 hover:bg-blue-300 text-white flex items-center gap-1 px-2 py-1 h-7 text-xs rounded-md ${!inspirations.trim() ? "opacity-50 cursor-not-allowed" : ""}`}
                 onClick={() => {
                   if (inspirations.trim()) {
                     generateProjectDescription()
@@ -574,7 +574,7 @@ export function ProjectForm() {
           <div className="flex justify-center">
             <Button
               type="submit"
-              className={`w-full bg-purple-600 hover:bg-purple-500 text-white font-medium py-2 rounded-md transition-all ${!projectName.trim() || !inspirations.trim() || !projectGoal.trim() || isLoading || isTyping ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`w-full bg-blue-400 hover:bg-blue-300 text-white font-medium py-2 rounded-md transition-all ${!projectName.trim() || !inspirations.trim() || !projectGoal.trim() || isLoading || isTyping ? "opacity-50 cursor-not-allowed" : ""}`}
               onClick={(e) => {
                 if (!projectName.trim() || !inspirations.trim() || !projectGoal.trim() || isLoading || isTyping) {
                   e.preventDefault()

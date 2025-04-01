@@ -174,7 +174,7 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
       let ticketIndex = -1
 
       // Find the parent ticket
-      for (let i = 0; i < newColumns.length; i++) {
+      for (let i = 0; i <newColumns.length; i++) {
         const column = newColumns[i]
         const tIndex = column.tickets.findIndex((t) => t.id === parentTicketId)
 
@@ -993,424 +993,59 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
     <div className="space-y-6 w-full h-full overflow-hidden flex flex-col">
       <Toaster />
       <style>{highlightStyle}</style>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{projectName}</h2>
-          <p className="text-slate-600 dark:text-slate-dark:text-slate-300 mt-1">{projectGoal}</p>
-        </div>
-        <div className="flex flex-col md:flex-row gap-2 items-center">
-          <div className="relative w-full md:w-64">
-            <Input
-              type="text"
-              placeholder="Search tickets..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                generateSuggestions(e.target.value)
-              }}
-              className="pl-8"
-            />
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery("")
-                  setSuggestions([])
-                }}
-                className="absolute right-2 top-2.5 text-slate-400 hover:text-slate-600"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-
-            {/* Liste des suggestions */}
-            {suggestions.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 rounded-md shadow-sm border border-slate-100 dark:border-slate-700 max-h-60 overflow-y-auto scrollbar-thin">
-                <style jsx global>{`
-                  .scrollbar-thin::-webkit-scrollbar {
-                    width: 6px;
-                  }
-                  .scrollbar-thin::-webkit-scrollbar-track {
-                    background: rgba(0, 0, 0, 0.05);
-                    border-radius: 3px;
-                  }
-                  .scrollbar-thin::-webkit-scrollbar-thumb {
-                    background: rgba(124, 58, 237, 0.3);
-                    border-radius: 3px;
-                    transition: background 0.2s ease;
-                  }
-                  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-                    background: rgba(124, 58, 237, 0.5);
-                  }
-                  .dark .scrollbar-thin::-webkit-scrollbar-track {
-                    background: rgba(255, 255, 255, 0.05);
-                  }
-                  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-                    background: rgba(124, 58, 237, 0.4);
-                  }
-                  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-                    background: rgba(124, 58, 237, 0.6);
-                  }
-                `}</style>
-                {suggestions.map((ticket) => (
-                  <div
-                    key={ticket.id}
-                    className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition-colors"
-                    onClick={() => {
-                      // Ouvrir le ticket en grand
-                      setExpandedTickets((prev) => ({
-                        ...prev,
-                        [ticket.id]: true,
-                      }))
-                      // Mettre à jour la recherche
-                      setSearchQuery(ticket.title)
-                      // Effacer les suggestions
-                      setSuggestions([])
-
-                      // Trouver le ticket dans les colonnes pour le mettre en évidence
-                      const ticketElement = document.getElementById(`ticket-${ticket.id}`)
-                      if (ticketElement) {
-                        ticketElement.scrollIntoView({ behavior: "smooth", block: "center" })
-                        ticketElement.classList.add("highlight-ticket")
-                        setTimeout(() => {
-                          ticketElement.classList.remove("highlight-ticket")
-                        }, 2000)
-                      }
-                    }}
-                  >
-                    <div className="font-medium text-sm text-slate-900 dark:text-white">{ticket.title}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
-                      {ticket.description}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setIsDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Ticket
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add a New Ticket</DialogTitle>
-                <DialogDescription>Create a new functional ticket for your project.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ticket-title">Title</Label>
-                  <Input
-                    id="ticket-title"
-                    placeholder="Ticket title"
-                    value={newTicket.title}
-                    onChange={(e) => setNewTicket({ ...newTicket, title: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ticket-description">Description</Label>
-                  <Textarea
-                    id="ticket-description"
-                    placeholder="Feature description"
-                    value={newTicket.description}
-                    onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
-                    className="min-h-[100px]"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddTicket}>Add</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* Edit Ticket Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingSubTicket ? "Edit Sub-ticket" : "Edit Ticket"}</DialogTitle>
-            <DialogDescription>
-              Modify the {editingSubTicket ? "sub-ticket" : "ticket"} details below.
-            </DialogDescription>
-          </DialogHeader>
-          {editingTicket && !editingSubTicket && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-ticket-title">Title</Label>
-                <Input
-                  id="edit-ticket-title"
-                  placeholder="Ticket title"
-                  value={editingTicket.title}
-                  onChange={(e) => setEditingTicket({ ...editingTicket, title: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-ticket-description">Description</Label>
-                <Textarea
-                  id="edit-ticket-description"
-                  placeholder="Feature description"
-                  value={editingTicket.description}
-                  onChange={(e) => setEditingTicket({ ...editingTicket, description: e.target.value })}
-                  className="min-h-[100px]"
-                />
-              </div>
-            </div>
-          )}
-          {editingSubTicket && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-subticket-title">Title</Label>
-                <Input
-                  id="edit-subticket-title"
-                  placeholder="Sub-ticket title"
-                  value={editingSubTicket.subTicket.title}
-                  onChange={(e) =>
-                    setEditingSubTicket({
-                      ...editingSubTicket,
-                      subTicket: { ...editingSubTicket.subTicket, title: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-subticket-description">Description</Label>
-                <Textarea
-                  id="edit-subticket-description"
-                  placeholder="Sub-task description"
-                  value={editingSubTicket.subTicket.description}
-                  onChange={(e) =>
-                    setEditingSubTicket({
-                      ...editingSubTicket,
-                      subTicket: { ...editingSubTicket.subTicket, description: e.target.value },
-                    })
-                  }
-                  className="min-h-[100px]"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsEditDialogOpen(false)
-                setEditingTicket(null)
-                setEditingSubTicket(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={editingSubTicket ? handleEditSubTicket : handleEditTicket}>Save Changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Sub-ticket Dialog */}
-      <Dialog open={isSubTicketDialogOpen} onOpenChange={setIsSubTicketDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add a New Sub-ticket</DialogTitle>
-            <DialogDescription>Create a new sub-task for: {selectedTicket?.title}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="subticket-title">Title</Label>
-              <Input
-                id="subticket-title"
-                placeholder="Sub-ticket title"
-                value={newSubTicket.title}
-                onChange={(e) => setNewSubTicket({ ...newSubTicket, title: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subticket-description">Description</Label>
-              <Textarea
-                id="subticket-description"
-                placeholder="Sub-task description"
-                value={newSubTicket.description}
-                onChange={(e) => setNewSubTicket({ ...newSubTicket, description: e.target.value })}
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSubTicketDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddSubTicket}>Add</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* AI Description Dialog */}
-      <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>AI-Enhanced Description</DialogTitle>
-            <DialogDescription>
-              Gemini has analyzed your ticket and generated an enhanced description.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {isGeneratingSuggestion ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                <p>Generating enhanced description with Gemini...</p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="original-description">Original Description</Label>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-md text-sm text-slate-600 dark:text-slate-300 border">
-                    {selectedTicket?.description}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ai-description">AI-Enhanced Description</Label>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-md text-sm text-slate-600 dark:text-slate-300 border min-h-[150px]">
-                    {generatedDescription}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAiDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleApplyGeneratedDescription}
-              disabled={isGeneratingSuggestion || !generatedDescription}
-            >
-              Apply Enhanced Description
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Direct Edit Dialog */}
-      <Dialog open={isDirectEditDialogOpen} onOpenChange={setIsDirectEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Description</DialogTitle>
-            <DialogDescription>Edit the ticket description below.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="direct-edit-description">Description</Label>
-              <Textarea
-                id="direct-edit-description"
-                placeholder="Ticket description"
-                value={directEditingText}
-                onChange={(e) => setDirectEditingText(e.target.value)}
-                className="min-h-[150px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsDirectEditDialogOpen(false)
-                setDirectEditingTicketId(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (directEditingTicketId) {
-                  handleSaveDirectEdit(directEditingTicketId)
-                  setIsDirectEditDialogOpen(false)
-                }
-              }}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Sub-ticket Edit Dialog */}
-      <Dialog open={isSubTicketEditDialogOpen} onOpenChange={setIsSubTicketEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Sub-ticket</DialogTitle>
-            <DialogDescription>Edit the sub-ticket description below.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="subticket-edit-description">Description</Label>
-              <Textarea
-                id="subticket-edit-description"
-                placeholder="Sub-ticket description"
-                value={directEditingSubTicketText}
-                onChange={(e) => setDirectEditingSubTicketText(e.target.value)}
-                className="min-h-[150px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsSubTicketEditDialogOpen(false)
-                setDirectEditingSubTicketId(null)
-                setDirectEditingSubTicketParentId(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (directEditingSubTicketId && directEditingSubTicketParentId) {
-                  handleSaveDirectEditSubTicket(directEditingSubTicketParentId, directEditingSubTicketId)
-                }
-              }}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Tabs defaultValue="kanban">
+      <Tabs defaultValue="board">
         <TabsList className="mb-4">
-          <TabsTrigger value="kanban">Kanban Board</TabsTrigger>
-          <TabsTrigger value="list">List View</TabsTrigger>
+          <TabsTrigger value="board">Board</TabsTrigger>
+          <TabsTrigger value="list">List</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="kanban" className="space-y-4 w-full flex-1 overflow-hidden">
+        <TabsContent value="board" className="space-y-4 w-full flex-1 overflow-hidden">
+          <div className="flex justify-end mb-4 px-2">
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-400 hover:bg-blue-300 text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Ticket
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add a New Ticket</DialogTitle>
+                  <DialogDescription>Create a new functional ticket for your project.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-title">Title</Label>
+                    <Input
+                      id="ticket-title"
+                      placeholder="Ticket title"
+                      value={newTicket.title}
+                      onChange={(e) => setNewTicket({ ...newTicket, title: e.target.value })}
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-description">Description</Label>
+                    <Textarea
+                      id="ticket-description"
+                      placeholder="Feature description"
+                      value={newTicket.description}
+                      onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
+                      className="min-h-[100px] bg-white"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddTicket} className="bg-blue-400 hover:bg-blue-300 text-white">Add</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
           <DragDropContext onDragEnd={onDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full h-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full h-full px-2">
               {columns.map((column) => {
                 const filteredTickets = filterTickets(column.tickets)
                 return (
@@ -1847,6 +1482,141 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* AI Description Dialog */}
+      <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>AI-Enhanced Description</DialogTitle>
+            <DialogDescription>
+              Gemini has analyzed your ticket and generated an enhanced description.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {isGeneratingSuggestion ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p>Generating enhanced description with Gemini...</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="original-description">Original Description</Label>
+                  <div className="p-3 bg-white rounded-md text-sm text-blue-500 border border-blue-400/30">
+                    {selectedTicket?.description}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ai-description">AI-Enhanced Description</Label>
+                  <div className="p-3 bg-white rounded-md text-sm text-blue-500 border border-blue-400/30 min-h-[150px]">
+                    {generatedDescription}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAiDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApplyGeneratedDescription}
+              disabled={isGeneratingSuggestion || !generatedDescription}
+              className="bg-blue-400 hover:bg-blue-300 text-white"
+            >
+              Apply Enhanced Description
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Direct Edit Dialog */}
+      <Dialog open={isDirectEditDialogOpen} onOpenChange={setIsDirectEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Description</DialogTitle>
+            <DialogDescription>Edit the ticket description below.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="direct-edit-description">Description</Label>
+              <Textarea
+                id="direct-edit-description"
+                placeholder="Ticket description"
+                value={directEditingText}
+                onChange={(e) => setDirectEditingText(e.target.value)}
+                className="min-h-[150px] bg-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDirectEditDialogOpen(false)
+                setDirectEditingTicketId(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (directEditingTicketId) {
+                  handleSaveDirectEdit(directEditingTicketId)
+                  setIsDirectEditDialogOpen(false)
+                }
+              }}
+              className="bg-blue-400 hover:bg-blue-300 text-white"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sub-ticket Edit Dialog */}
+      <Dialog open={isSubTicketEditDialogOpen} onOpenChange={setIsSubTicketEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Sub-ticket</DialogTitle>
+            <DialogDescription>Edit the sub-ticket description below.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="subticket-edit-description">Description</Label>
+              <Textarea
+                id="subticket-edit-description"
+                placeholder="Sub-ticket description"
+                value={directEditingSubTicketText}
+                onChange={(e) => setDirectEditingSubTicketText(e.target.value)}
+                className="min-h-[150px] bg-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsSubTicketEditDialogOpen(false)
+                setDirectEditingSubTicketId(null)
+                setDirectEditingSubTicketParentId(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (directEditingSubTicketId && directEditingSubTicketParentId) {
+                  handleSaveDirectEditSubTicket(directEditingSubTicketParentId, directEditingSubTicketId)
+                }
+              }}
+              className="bg-blue-400 hover:bg-blue-300 text-white"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -1907,4 +1677,3 @@ const highlightStyle = `
 
 // Exporter à la fois comme exportation nommée et par défaut
 export default KanbanBoard
-
