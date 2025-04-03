@@ -11,9 +11,16 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Sparkles } from "lucide-react"
 import { enhanceProjectDescription } from "@/app/actions/gemini-integration"
+import { useSession } from "next-auth/react"
+import { toast } from "@/components/ui/use-toast"
 
-export function ProjectFormEnhanced() {
+interface ProjectFormEnhancedProps {
+  onProjectCreated?: () => void;
+}
+
+export function ProjectFormEnhanced({ onProjectCreated }: ProjectFormEnhancedProps) {
   const router = useRouter()
+  const { data: session } = useSession()
   const [projectName, setProjectName] = useState("")
   const [projectGoal, setProjectGoal] = useState("")
   const [inspirations, setInspirations] = useState("")
@@ -86,22 +93,96 @@ export function ProjectFormEnhanced() {
     }
   }
 
+  // Fonction pour créer un projet dans la base de données
+  const createProjectInDatabase = async (name: string, description: string) => {
+    if (!session?.user?.id) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Vous devez être connecté pour créer un projet.",
+      })
+      return false
+    }
+
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          description,
+          color: '#3B82F6', // Couleur bleue par défaut
+          icon: 'sparkles', // Icône par défaut
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${await response.text()}`)
+      }
+
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error("Erreur lors de la création du projet:", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de créer le projet. Veuillez réessayer.",
+      })
+      return false
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      // Construire l'URL avec les paramètres du projet
-      const params = new URLSearchParams()
-      // Use a default name if none is provided
-      params.append("name", projectName || "Untitled Project")
-      params.append("goal", projectGoal)
-      if (inspirations) {
-        params.append("inspirations", inspirations)
-      }
+      // Créer le projet dans la base de données
+      const projectData = await createProjectInDatabase(
+        projectName || "Untitled Project",
+        projectGoal
+      )
 
-      // Rediriger vers la page Kanban avec les paramètres
-      router.push(`/kanban?${params.toString()}`)
+      if (projectData) {
+        // Ajouter le projet au localStorage pour la compatibilité avec le code existant
+        try {
+          const storedProjects = localStorage.getItem("skwerd-projects")
+          let projectsList = storedProjects ? JSON.parse(storedProjects) : []
+          
+          // Vérifier si le projet existe déjà
+          if (!projectsList.some((p: any) => p.name === projectName)) {
+            const newProject = {
+              id: `project-${projectData.id || Date.now()}`,
+              name: projectName || "Untitled Project",
+              date: "Today",
+              goal: projectGoal,
+            }
+            
+            projectsList = [newProject, ...projectsList]
+            localStorage.setItem("skwerd-projects", JSON.stringify(projectsList))
+          }
+        } catch (error) {
+          console.error("Erreur lors de l'ajout du projet au localStorage:", error)
+        }
+
+        // Appeler le callback si fourni
+        if (onProjectCreated) {
+          onProjectCreated()
+        }
+
+        // Construire l'URL avec les paramètres du projet
+        const params = new URLSearchParams()
+        params.append("projectId", projectData.id)
+        params.append("name", projectName || "Untitled Project")
+        
+        // Rediriger vers la page Kanban avec les paramètres
+        router.push(`/kanban?${params.toString()}`)
+      } else {
+        setIsLoading(false)
+      }
     } catch (error) {
       console.error("Error:", error)
       setIsLoading(false)

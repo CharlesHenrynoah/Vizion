@@ -32,11 +32,10 @@ import {
   ListPlus,
   Loader2,
 } from "lucide-react"
-import type { Ticket, SubTicket } from "@/app/actions/generate-tickets"
+import { Ticket, SubTicket } from "@/app/kanban/page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-import { enrichTicketDescription, enrichSubTicketDescription } from "@/app/actions/ai-actions"
 
 // Types for our columns
 type ColumnType = {
@@ -47,17 +46,26 @@ type ColumnType = {
 
 interface KanbanBoardProps {
   projectName: string
-  projectGoal: string
-  initialTickets?: Ticket[]
+  projectId: string
+  columns: ColumnType[]
+  onCreateTicket: (ticket: Partial<Ticket>) => Promise<Ticket>
+  onUpdateTicket: (ticket: Partial<Ticket>) => Promise<Ticket>
+  onDeleteTicket: (ticketId: string) => Promise<boolean>
 }
 
-export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: KanbanBoardProps) {
-  // Initialize columns with AI-generated tickets
-  const [columns, setColumns] = useState<ColumnType[]>([
+export default function KanbanBoard({ 
+  projectName, 
+  projectId, 
+  columns: initialColumns, 
+  onCreateTicket, 
+  onUpdateTicket, 
+  onDeleteTicket 
+}: KanbanBoardProps) {
+  const [columns, setColumns] = useState<ColumnType[]>(initialColumns || [
     {
       id: "column-1",
       title: "To Do",
-      tickets: initialTickets.length > 0 ? initialTickets : [],
+      tickets: [],
     },
     {
       id: "column-2",
@@ -74,10 +82,7 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false)
   const [isSubTicketDialogOpen, setIsSubTicketDialogOpen] = useState(false)
-  const [aiSuggestion, setAiSuggestion] = useState("")
-  const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false)
   const [newTicket, setNewTicket] = useState<{ title: string; description: string }>({
     title: "",
     description: "",
@@ -96,7 +101,6 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
   } | null>(null)
   const [directEditingTicketId, setDirectEditingTicketId] = useState<string | null>(null)
   const [directEditingText, setDirectEditingText] = useState("")
-  const [generatedDescription, setGeneratedDescription] = useState("")
   const [expandedTickets, setExpandedTickets] = useState<Record<string, boolean>>({})
   const [directEditingSubTicketId, setDirectEditingSubTicketId] = useState<string | null>(null)
   const [directEditingSubTicketText, setDirectEditingSubTicketText] = useState("")
@@ -104,7 +108,7 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
 
   // Ajouter après les autres états
   const [searchQuery, setSearchQuery] = useState("")
-  const [suggestions, setSuggestions] = useState<Ticket[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
   // Toggle expanded state for a ticket
   const toggleTicketExpanded = (ticketId: string) => {
@@ -120,7 +124,7 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
   }
 
   // Handle drag and drop
-  const onDragEnd = (result: any) => {
+  const onDragEnd = async (result: any) => {
     const { destination, source, draggableId, type } = result
 
     // If there's no destination or the item is dropped in the same place
@@ -156,6 +160,23 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
       newDestCol.tickets = newTickets
 
       setColumns(newColumns)
+
+      // Mettre à jour le statut du ticket dans la base de données
+      const statusId = parseInt(destColumn.id.split('-')[1])
+      try {
+        await onUpdateTicket({
+          id: draggableId,
+          statusId,
+          position: destination.index
+        })
+      } catch (error) {
+        console.error("Erreur lors de la mise à jour du statut du ticket:", error)
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de mettre à jour le statut du ticket.",
+        })
+      }
     }
     // Handle sub-ticket drag within a ticket
     else if (type === "subticket") {
@@ -174,7 +195,7 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
       let ticketIndex = -1
 
       // Find the parent ticket
-      for (let i = 0; i <newColumns.length; i++) {
+      for (let i = 0; i < newColumns.length; i++) {
         const column = newColumns[i]
         const tIndex = column.tickets.findIndex((t) => t.id === parentTicketId)
 
@@ -186,7 +207,7 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
         }
       }
 
-      if (!parentTicket || columnIndex === -1 || ticketIndex === -1) return
+      if (!parentTicket || columnIndex === -1 || ticketIndex === -1 || !parentTicket.subTickets) return
 
       // Reorder the sub-tickets
       const subTickets = Array.from(parentTicket.subTickets)
@@ -200,1480 +221,574 @@ export function KanbanBoard({ projectName, projectGoal, initialTickets = [] }: K
       }
 
       setColumns(newColumns)
-    }
-  }
 
-  // Handle adding a new ticket
-  const handleAddTicket = () => {
-    if (newTicket.title.trim() === "" || newTicket.description.trim() === "") {
-      return
-    }
-
-    const newTicketObj: Ticket = {
-      id: `ticket-${Date.now()}`,
-      title: newTicket.title,
-      description: newTicket.description,
-      subTickets: [],
-    }
-
-    const newColumns = [...columns]
-    const todoColumn = newColumns.find((col) => col.id === "column-1")
-    if (todoColumn) {
-      todoColumn.tickets = [...todoColumn.tickets, newTicketObj]
-    }
-
-    setColumns(newColumns)
-    setNewTicket({ title: "", description: "" })
-    setIsDialogOpen(false)
-
-    // Automatiquement développer le nouveau ticket pour montrer qu'on peut y ajouter des sous-tickets
-    setExpandedTickets((prev) => ({
-      ...prev,
-      [newTicketObj.id]: true,
-    }))
-
-    toast({
-      title: "Ticket Added",
-      description: "New ticket has been added to the To Do column",
-    })
-  }
-
-  // Handle adding a new sub-ticket
-  const handleAddSubTicket = () => {
-    if (!selectedTicket || newSubTicket.title.trim() === "" || newSubTicket.description.trim() === "") {
-      return
-    }
-
-    const newSubTicketObj: SubTicket = {
-      id: `subticket-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      title: newSubTicket.title,
-      description: newSubTicket.description,
-    }
-
-    const newColumns = [...columns]
-
-    // Find the column and ticket to add the sub-ticket to
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === selectedTicket.id)
-
-      if (ticketIndex !== -1) {
-        // Add the sub-ticket to the parent ticket
-        column.tickets[ticketIndex] = {
-          ...column.tickets[ticketIndex],
-          subTickets: [...column.tickets[ticketIndex].subTickets, newSubTicketObj],
-        }
-        break
-      }
-    }
-
-    setColumns(newColumns)
-    setNewSubTicket({ title: "", description: "" })
-    setIsSubTicketDialogOpen(false)
-
-    // Make sure the parent ticket is expanded to show the new sub-ticket
-    setExpandedTickets((prev) => ({
-      ...prev,
-      [selectedTicket.id]: true,
-    }))
-
-    toast({
-      title: "Sub-ticket Added",
-      description: "New sub-ticket has been added to the ticket",
-    })
-  }
-
-  // Handle editing a ticket
-  const handleEditTicket = () => {
-    if (!editingTicket || editingTicket.title.trim() === "" || editingTicket.description.trim() === "") {
-      return
-    }
-
-    const newColumns = [...columns]
-
-    // Find the column containing the ticket
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === editingTicket.id)
-
-      if (ticketIndex !== -1) {
-        // Update the ticket
-        column.tickets[ticketIndex] = {
-          ...editingTicket,
-        }
-        break
-      }
-    }
-
-    setColumns(newColumns)
-    setEditingTicket(null)
-    setIsEditDialogOpen(false)
-
-    toast({
-      title: "Ticket Updated",
-      description: "The ticket has been successfully updated",
-    })
-  }
-
-  // Handle editing a sub-ticket
-  const handleEditSubTicket = () => {
-    if (
-      !editingSubTicket ||
-      !editingSubTicket.subTicket.title.trim() ||
-      !editingSubTicket.subTicket.description.trim()
-    ) {
-      return
-    }
-
-    const newColumns = [...columns]
-
-    // Find the column and ticket containing the sub-ticket
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === editingSubTicket.parentId)
-
-      if (ticketIndex !== -1) {
-        const ticket = column.tickets[ticketIndex]
-        const subTicketIndex = ticket.subTickets.findIndex((st) => st.id === editingSubTicket.subTicket.id)
-
-        if (subTicketIndex !== -1) {
-          // Update the sub-ticket
-          const updatedSubTickets = [...ticket.subTickets]
-          updatedSubTickets[subTicketIndex] = editingSubTicket.subTicket
-
-          column.tickets[ticketIndex] = {
-            ...ticket,
-            subTickets: updatedSubTickets,
-          }
-          break
-        }
-      }
-    }
-
-    setColumns(newColumns)
-    setEditingSubTicket(null)
-    setIsEditDialogOpen(false)
-
-    toast({
-      title: "Sub-ticket Updated",
-      description: "The sub-ticket has been successfully updated",
-    })
-  }
-
-  // Handle deleting a ticket
-  const handleDeleteTicket = (ticketId: string) => {
-    const newColumns = [...columns]
-
-    // Find the column containing the ticket
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === ticketId)
-
-      if (ticketIndex !== -1) {
-        // Remove the ticket
-        column.tickets.splice(ticketIndex, 1)
-        break
-      }
-    }
-
-    setColumns(newColumns)
-
-    toast({
-      title: "Ticket Deleted",
-      description: "The ticket has been removed from the board",
-    })
-  }
-
-  // Handle deleting a sub-ticket
-  const handleDeleteSubTicket = (parentId: string, subTicketId: string) => {
-    const newColumns = [...columns]
-
-    // Find the column and ticket containing the sub-ticket
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === parentId)
-
-      if (ticketIndex !== -1) {
-        const ticket = column.tickets[ticketIndex]
-
-        // Remove the sub-ticket
-        column.tickets[ticketIndex] = {
-          ...ticket,
-          subTickets: ticket.subTickets.filter((st) => st.id !== subTicketId),
-        }
-        break
-      }
-    }
-
-    setColumns(newColumns)
-
-    toast({
-      title: "Sub-ticket Deleted",
-      description: "The sub-ticket has been removed from the ticket",
-    })
-  }
-
-  // Handle copying a ticket
-  const handleCopyTicket = (ticket: Ticket) => {
-    const newTicketObj: Ticket = {
-      id: `ticket-${Date.now()}`,
-      title: `${ticket.title} (Copy)`,
-      description: ticket.description,
-      subTickets: ticket.subTickets.map((st) => ({
-        id: `subticket-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        title: st.title,
-        description: st.description,
-      })),
-    }
-
-    // Find the column containing the original ticket
-    const newColumns = [...columns]
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === ticket.id)
-
-      if (ticketIndex !== -1) {
-        // Add the copy right after the original
-        column.tickets.splice(ticketIndex + 1, 0, newTicketObj)
-        break
-      }
-    }
-
-    setColumns(newColumns)
-
-    toast({
-      title: "Ticket Copied",
-      description: "A copy of the ticket has been created",
-    })
-  }
-
-  // Handle copying a sub-ticket
-  const handleCopySubTicket = (parentId: string, subTicket: SubTicket) => {
-    const newSubTicketObj: SubTicket = {
-      id: `subticket-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      title: `${subTicket.title} (Copy)`,
-      description: subTicket.description,
-    }
-
-    const newColumns = [...columns]
-
-    // Find the column and ticket containing the sub-ticket
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === parentId)
-
-      if (ticketIndex !== -1) {
-        const ticket = column.tickets[ticketIndex]
-        const subTicketIndex = ticket.subTickets.findIndex((st) => st.id === subTicket.id)
-
-        if (subTicketIndex !== -1) {
-          // Add the copy right after the original
-          const updatedSubTickets = [...ticket.subTickets]
-          updatedSubTickets.splice(subTicketIndex + 1, 0, newSubTicketObj)
-
-          column.tickets[ticketIndex] = {
-            ...ticket,
-            subTickets: updatedSubTickets,
-          }
-          break
-        }
-      }
-    }
-
-    setColumns(newColumns)
-
-    toast({
-      title: "Sub-ticket Copied",
-      description: "A copy of the sub-ticket has been created",
-    })
-  }
-
-  // Handle copying ticket text to clipboard
-  const handleCopyTicketText = (ticket: Ticket) => {
-    try {
-      // Préparer le texte à copier, incluant uniquement la description du ticket principal
-      let textToCopy = ticket.description
-
-      // Ajouter les sous-tickets s'il y en a, mais sans le titre "--- Sub-tickets ---"
-      if (ticket.subTickets.length > 0) {
-        ticket.subTickets.forEach((subTicket, index) => {
-          textToCopy += `\n\n${subTicket.description}`
+      // Mettre à jour la position du sous-ticket dans la base de données
+      try {
+        await onUpdateTicket({
+          id: movedSubTicket.id,
+          position: destination.index
         })
-      }
-
-      // Créer un élément textarea temporaire
-      const textArea = document.createElement("textarea")
-      textArea.value = textToCopy
-
-      // Le rendre invisible mais le garder dans le DOM
-      textArea.style.position = "fixed"
-      textArea.style.left = "-999999px"
-      textArea.style.top = "-999999px"
-      document.body.appendChild(textArea)
-
-      // Sélectionner et copier le texte
-      textArea.focus()
-      textArea.select()
-      const successful = document.execCommand("copy")
-
-      // Nettoyer
-      document.body.removeChild(textArea)
-
-      if (successful) {
-        toast({
-          title: "Text copied",
-          description: "Ticket content with sub-tickets has been copied to clipboard",
-        })
-      } else {
-        throw new Error("Copy command failed")
-      }
-    } catch (err) {
-      console.error("Erreur lors de la copie du texte: ", err)
-
-      // Essayer une méthode alternative avec l'API Clipboard moderne
-      if (navigator.clipboard) {
-        // Préparer le texte à copier, incluant uniquement la description du ticket principal
-        let textToCopy = ticket.description
-
-        // Ajouter les sous-tickets s'il y en a, mais sans le titre "--- Sub-tickets ---"
-        if (ticket.subTickets.length > 0) {
-          ticket.subTickets.forEach((subTicket, index) => {
-            textToCopy += `\n\n${subTicket.description}`
-          })
-        }
-
-        navigator.clipboard
-          .writeText(textToCopy)
-          .then(() => {
-            toast({
-              title: "Text copied",
-              description: "Ticket content with sub-tickets has been copied to clipboard",
-            })
-          })
-          .catch((err) => {
-            console.error("Error with Clipboard API: ", err)
-            toast({
-              variant: "destructive",
-              title: "Error",
-              description: "Unable to copy text. Try selecting it manually.",
-            })
-          })
-      } else {
+      } catch (error) {
+        console.error("Erreur lors de la mise à jour de la position du sous-ticket:", error)
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Unable to copy text. Try selecting it manually.",
+          title: "Erreur",
+          description: "Impossible de mettre à jour la position du sous-ticket.",
         })
       }
     }
   }
 
-  // Handle copying sub-ticket text to clipboard
-  const handleCopySubTicketText = (subTicket: SubTicket) => {
-    try {
-      const textArea = document.createElement("textarea")
-      textArea.value = subTicket.description
-
-      textArea.style.position = "fixed"
-      textArea.style.left = "-999999px"
-      textArea.style.top = "-999999px"
-      document.body.appendChild(textArea)
-
-      textArea.focus()
-      textArea.select()
-      const successful = document.execCommand("copy")
-
-      document.body.removeChild(textArea)
-
-      if (successful) {
-        toast({
-          title: "Text copied",
-          description: "Sub-ticket content has been copied to clipboard",
-        })
-      } else {
-        throw new Error("Copy command failed")
-      }
-    } catch (err) {
-      console.error("Error copying text: ", err)
-
-      if (navigator.clipboard) {
-        navigator.clipboard
-          .writeText(subTicket.description)
-          .then(() => {
-            toast({
-              title: "Text copied",
-              description: "Sub-ticket content has been copied to clipboard",
-            })
-          })
-          .catch((err) => {
-            console.error("Error with Clipboard API: ", err)
-            toast({
-              variant: "destructive",
-              title: "Error",
-              description: "Unable to copy text. Try selecting it manually.",
-            })
-          })
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Unable to copy text. Try selecting it manually.",
-        })
-      }
-    }
-  }
-
-  // Handle direct editing of ticket description
-  const handleStartDirectEdit = (ticket: Ticket) => {
-    setDirectEditingTicketId(ticket.id)
-    setDirectEditingText(ticket.description)
-    setIsDirectEditDialogOpen(true)
-  }
-
-  const handleSaveDirectEdit = (ticketId: string) => {
-    if (directEditingText.trim() === "") return
-
-    const newColumns = [...columns]
-
-    // Find the column containing the ticket
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === ticketId)
-
-      if (ticketIndex !== -1) {
-        // Update the ticket description
-        column.tickets[ticketIndex] = {
-          ...column.tickets[ticketIndex],
-          description: directEditingText,
-        }
-        break
-      }
-    }
-
-    setColumns(newColumns)
-    setDirectEditingTicketId(null)
-    setIsDirectEditDialogOpen(false)
-
-    toast({
-      title: "Description Updated",
-      description: "The ticket description has been updated",
-    })
-  }
-
-  const handleCancelDirectEdit = () => {
-    setDirectEditingTicketId(null)
-    setIsDirectEditDialogOpen(false)
-  }
-
-  // Handle direct editing of sub-ticket description
-  const handleStartDirectEditSubTicket = (parentId: string, subTicket: SubTicket) => {
-    setDirectEditingSubTicketId(subTicket.id)
-    setDirectEditingSubTicketParentId(parentId)
-    setDirectEditingSubTicketText(subTicket.description)
-    setIsSubTicketEditDialogOpen(true)
-  }
-
-  const handleSaveDirectEditSubTicket = (parentId: string, subTicketId: string) => {
-    if (directEditingSubTicketText.trim() === "") return
-
-    const newColumns = [...columns]
-
-    // Find the column and ticket containing the sub-ticket
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === parentId)
-
-      if (ticketIndex !== -1) {
-        const ticket = column.tickets[ticketIndex]
-        const subTicketIndex = ticket.subTickets.findIndex((st) => st.id === subTicketId)
-
-        if (subTicketIndex !== -1) {
-          // Update the sub-ticket description
-          const updatedSubTickets = [...ticket.subTickets]
-          updatedSubTickets[subTicketIndex] = {
-            ...updatedSubTickets[subTicketIndex],
-            description: directEditingSubTicketText,
-          }
-
-          column.tickets[ticketIndex] = {
-            ...ticket,
-            subTickets: updatedSubTickets,
-          }
-          break
-        }
-      }
-    }
-
-    setColumns(newColumns)
-    setDirectEditingSubTicketId(null)
-    setDirectEditingSubTicketParentId(null)
-    setIsSubTicketEditDialogOpen(false)
-
-    toast({
-      title: "Description Updated",
-      description: "The sub-ticket description has been updated",
-    })
-  }
-
-  const handleCancelDirectEditSubTicket = () => {
-    setDirectEditingSubTicketId(null)
-    setDirectEditingSubTicketParentId(null)
-    setIsSubTicketEditDialogOpen(false)
-  }
-
-  // Get all tickets from all columns
-  const getAllTickets = () => {
-    return columns.flatMap((column) => column.tickets)
-  }
-
-  // Handle generating AI description for a ticket
-  const handleGenerateAiDescription = async (ticketParam?: Ticket) => {
-    // Utiliser le ticket passé en paramètre ou selectedTicket
-    const ticketToUse = ticketParam || selectedTicket
-
-    if (!ticketToUse) {
-      console.error("No ticket selected for AI description generation")
-      return
-    }
-
-    setIsGeneratingSuggestion(true)
-    setGeneratedDescription("")
-
-    try {
-      // Get all other tickets to provide context
-      const allTickets = getAllTickets()
-      const otherTickets = allTickets
-        .filter((t) => t.id !== ticketToUse.id)
-        .map((t) => ({ title: t.title, description: t.description }))
-
-      // Call the server action to generate a new description
-      const newDescription = await enrichTicketDescription(ticketToUse.title, ticketToUse.description, otherTickets)
-
-      setGeneratedDescription(newDescription)
-    } catch (error) {
-      console.error("Error generating AI description:", error)
+  // Handle ticket creation
+  const handleCreateTicket = async () => {
+    if (!newTicket.title.trim()) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to generate AI description. Please try again.",
+        title: "Erreur",
+        description: "Le titre du ticket ne peut pas être vide.",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      // Créer le ticket dans la base de données
+      const createdTicket = await onCreateTicket({
+        title: newTicket.title,
+        description: newTicket.description,
+        statusId: 1, // "To Do" par défaut
+        projectId: parseInt(projectId),
+        isSubTicket: false
+      })
+
+      setIsDialogOpen(false)
+      setNewTicket({ title: "", description: "" })
+      
+      toast({
+        title: "Succès",
+        description: "Ticket créé avec succès.",
+      })
+    } catch (error) {
+      console.error("Erreur lors de la création du ticket:", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de créer le ticket. Veuillez réessayer.",
       })
     } finally {
-      setIsGeneratingSuggestion(false)
+      setIsLoading(false)
     }
   }
 
-  // Handle generating AI description for a sub-ticket
-  const handleGenerateSubTicketAiDescription = async (parentTicket: Ticket, subTicket: SubTicket) => {
-    try {
-      toast({
-        title: "Generating AI description",
-        description: "Please wait while Gemini enhances the sub-ticket description...",
-      })
-
-      // Get other sub-tickets from the parent ticket
-      const otherSubTickets = parentTicket.subTickets
-        .filter((st) => st.id !== subTicket.id)
-        .map((st) => ({ title: st.title, description: st.description }))
-
-      // Call the server action to generate a new description
-      const newDescription = await enrichSubTicketDescription(
-        parentTicket.title,
-        parentTicket.description,
-        subTicket.title,
-        subTicket.description,
-        otherSubTickets,
-      )
-
-      // Update the sub-ticket with the new description
-      const newColumns = [...columns]
-      for (const column of newColumns) {
-        const ticketIndex = column.tickets.findIndex((t) => t.id === parentTicket.id)
-        if (ticketIndex !== -1) {
-          const ticket = column.tickets[ticketIndex]
-          const subTicketIndex = ticket.subTickets.findIndex((st) => st.id === subTicket.id)
-          if (subTicketIndex !== -1) {
-            // Update the sub-ticket description
-            const updatedSubTickets = [...ticket.subTickets]
-            updatedSubTickets[subTicketIndex] = {
-              ...updatedSubTickets[subTicketIndex],
-              description: newDescription,
-            }
-
-            column.tickets[ticketIndex] = {
-              ...ticket,
-              subTickets: updatedSubTickets,
-            }
-            break
-          }
-        }
-      }
-
-      setColumns(newColumns)
-
-      toast({
-        title: "Description Enhanced",
-        description: "The sub-ticket description has been enhanced with Gemini AI",
-      })
-    } catch (error) {
-      console.error("Error generating AI description for sub-ticket:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to generate AI description with Gemini. Please try again.",
-      })
-    }
-  }
-
-  // New function to handle AI description generation for main tickets
-  const handleGenerateMainTicketAiDescription = async (ticket: Ticket) => {
-    try {
-      // Show loading toast
-      toast({
-        title: "Enhancing description",
-        description: "Please wait while Gemini improves the ticket description...",
-      })
-
-      // Get all other tickets to provide context
-      const allTickets = getAllTickets()
-      const otherTickets = allTickets
-        .filter((t) => t.id !== ticket.id)
-        .map((t) => ({ title: t.title, description: t.description }))
-
-      // Call the server action to generate a new description
-      const newDescription = await enrichTicketDescription(ticket.title, ticket.description, otherTickets)
-
-      // Update the ticket with the new description
-      const newColumns = [...columns]
-      for (const column of newColumns) {
-        const ticketIndex = column.tickets.findIndex((t) => t.id === ticket.id)
-        if (ticketIndex !== -1) {
-          // Update the ticket description
-          column.tickets[ticketIndex] = {
-            ...column.tickets[ticketIndex],
-            description: newDescription,
-          }
-          break
-        }
-      }
-
-      setColumns(newColumns)
-
-      toast({
-        title: "Description Enhanced",
-        description: "The ticket description has been improved with Gemini AI",
-      })
-    } catch (error) {
-      console.error("Error generating AI description for ticket:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to generate AI description with Gemini. Please try again.",
-      })
-    }
-  }
-
-  // Apply the generated description to the ticket
-  const handleApplyGeneratedDescription = () => {
-    if (!selectedTicket || !generatedDescription) return
-
-    const newColumns = [...columns]
-
-    // Find the column containing the ticket
-    for (const column of newColumns) {
-      const ticketIndex = column.tickets.findIndex((t) => t.id === selectedTicket.id)
-
-      if (ticketIndex !== -1) {
-        // Update the ticket description
-        column.tickets[ticketIndex] = {
-          ...column.tickets[ticketIndex],
-          description: generatedDescription,
-        }
-        break
-      }
-    }
-
-    setColumns(newColumns)
-    setIsAiDialogOpen(false)
-    setGeneratedDescription("")
-
-    toast({
-      title: "Description Updated",
-      description: "The ticket description has been updated with AI-generated content",
-    })
-  }
-
-  // Fonction pour filtrer les tickets en fonction de la recherche
-  const filterTickets = (tickets: Ticket[]) => {
-    if (!searchQuery.trim()) return tickets
-
-    const query = searchQuery.toLowerCase().trim()
-
-    // Si la requête est vide, retourner tous les tickets
-    if (query.length === 0) return tickets
-
-    // Sinon, filtrer les tickets dont la première lettre du titre correspond à la première lettre de la requête
-    const firstLetter = query[0]
-
-    return tickets.filter((ticket) => ticket.title.toLowerCase()[0] === firstLetter)
-  }
-
-  // Fonction pour générer des suggestions de tickets en fonction de la recherche
-  const generateSuggestions = (query: string) => {
-    if (!query.trim()) {
-      setSuggestions([])
-      return
-    }
-
-    const query_lower = query.toLowerCase().trim()
-
-    // Si la requête est vide, ne pas générer de suggestions
-    if (query_lower.length === 0) {
-      setSuggestions([])
-      return
-    }
-
-    // Sinon, filtrer les tickets dont la première lettre du titre correspond à la première lettre de la requête
-    const firstLetter = query_lower[0]
-    const allTickets = getAllTickets()
-
-    // Filtrer les tickets qui correspondent à la recherche uniquement par la première lettre du titre
-    const matchingTickets = allTickets.filter((ticket) => ticket.title.toLowerCase()[0] === firstLetter)
-
-    // Limiter à 5 suggestions maximum
-    setSuggestions(matchingTickets.slice(0, 5))
-  }
-
-  // Handle generating AI suggestion for a ticket
-  const handleGenerateAiSuggestion = () => {
+  // Handle sub-ticket creation
+  const handleCreateSubTicket = async () => {
     if (!selectedTicket) return
-
-    setIsGeneratingSuggestion(true)
-
-    // Simulate AI processing
-    setTimeout(() => {
-      const suggestions = [
-        "To implement this feature, I recommend creating a React component with a controlled form that captures user inputs. Use text fields for the project name and text areas for longer descriptions. Add client-side validation to ensure required fields are filled before submission.",
-        "This feature requires integration with a language model like GPT-4. You'll need to create an API that sends the project description to the model with a well-structured prompt asking to analyze the text and extract key elements for project structuring.",
-        "For this feature, I suggest using a drag-and-drop library like react-beautiful-dnd to allow users to easily reorganize tickets between columns. Each ticket should be a component with its own state and actions for editing and deletion.",
-      ]
-
-      // Choose a random suggestion based on the ticket
-      const index = Math.floor(Math.random() * suggestions.length)
-      setAiSuggestion(suggestions[index])
-      setIsGeneratingSuggestion(false)
-    }, 1500)
-  }
-
-  // Export the Kanban board as JSON
-  const handleExport = () => {
-    const exportData = {
-      projectName,
-      projectGoal,
-      tickets: columns.map((column) => ({
-        column: column.title,
-        tickets: column.tickets.map((ticket) => ({
-          title: ticket.title,
-          description: ticket.description,
-          subTickets: ticket.subTickets.map((st) => ({
-            title: st.title,
-            description: st.description,
-          })),
-        })),
-      })),
+    if (!newSubTicket.title.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Le titre du sous-ticket ne peut pas être vide.",
+      })
+      return
     }
 
-    const dataStr = JSON.stringify(exportData, null, 2)
-    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`
+    setIsLoading(true)
+    try {
+      // Créer le sous-ticket dans la base de données
+      const createdSubTicket = await onCreateTicket({
+        title: newSubTicket.title,
+        description: newSubTicket.description,
+        statusId: selectedTicket.statusId,
+        projectId: parseInt(projectId),
+        isSubTicket: true,
+        parentTicketId: parseInt(selectedTicket.id)
+      })
 
-    const exportFileDefaultName = `${projectName.replace(/\s+/g, "-").toLowerCase()}-kanban.json`
+      setIsSubTicketDialogOpen(false)
+      setNewSubTicket({ title: "", description: "" })
+      
+      toast({
+        title: "Succès",
+        description: "Sous-ticket créé avec succès.",
+      })
+    } catch (error) {
+      console.error("Erreur lors de la création du sous-ticket:", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de créer le sous-ticket. Veuillez réessayer.",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-    const linkElement = document.createElement("a")
-    linkElement.setAttribute("href", dataUri)
-    linkElement.setAttribute("download", exportFileDefaultName)
-    linkElement.click()
+  // Handle ticket edit
+  const handleEditTicket = async () => {
+    if (!editingTicket) return
+    if (!editingTicket.title.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Le titre du ticket ne peut pas être vide.",
+      })
+      return
+    }
 
-    toast({
-      title: "Board Exported",
-      description: "Your Kanban board has been exported as JSON",
-    })
+    setIsLoading(true)
+    try {
+      // Mettre à jour le ticket dans la base de données
+      await onUpdateTicket({
+        id: editingTicket.id,
+        title: editingTicket.title,
+        description: editingTicket.description
+      })
+
+      setIsEditDialogOpen(false)
+      setEditingTicket(null)
+      
+      toast({
+        title: "Succès",
+        description: "Ticket mis à jour avec succès.",
+      })
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du ticket:", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de mettre à jour le ticket. Veuillez réessayer.",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Handle sub-ticket edit
+  const handleEditSubTicket = async () => {
+    if (!editingSubTicket) return
+    if (!editingSubTicket.subTicket.title.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Le titre du sous-ticket ne peut pas être vide.",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      // Mettre à jour le sous-ticket dans la base de données
+      await onUpdateTicket({
+        id: editingSubTicket.subTicket.id,
+        title: editingSubTicket.subTicket.title,
+        description: editingSubTicket.subTicket.description
+      })
+
+      setIsSubTicketEditDialogOpen(false)
+      setEditingSubTicket(null)
+      
+      toast({
+        title: "Succès",
+        description: "Sous-ticket mis à jour avec succès.",
+      })
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du sous-ticket:", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de mettre à jour le sous-ticket. Veuillez réessayer.",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Handle ticket deletion
+  const handleDeleteTicket = async (ticketId: string) => {
+    if (!ticketId) return
+
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce ticket ?")) {
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      // Supprimer le ticket dans la base de données
+      await onDeleteTicket(ticketId)
+      
+      toast({
+        title: "Succès",
+        description: "Ticket supprimé avec succès.",
+      })
+    } catch (error) {
+      console.error("Erreur lors de la suppression du ticket:", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de supprimer le ticket. Veuillez réessayer.",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <div className="space-y-6 w-full h-full overflow-hidden flex flex-col">
-      <Toaster />
-      <style>{highlightStyle}</style>
-      <Tabs defaultValue="board">
-        <TabsList className="mb-4">
-          <TabsTrigger value="board">Board</TabsTrigger>
-          <TabsTrigger value="list">List</TabsTrigger>
-        </TabsList>
+    <div className="p-4 space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">{projectName}</h1>
+        <Button onClick={() => setIsDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Ajouter un ticket
+        </Button>
+      </div>
 
-        <TabsContent value="board" className="space-y-4 w-full flex-1 overflow-hidden">
-          <div className="flex justify-end mb-4 px-2">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-blue-400 hover:bg-blue-300 text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Ticket
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add a New Ticket</DialogTitle>
-                  <DialogDescription>Create a new functional ticket for your project.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-title">Title</Label>
-                    <Input
-                      id="ticket-title"
-                      placeholder="Ticket title"
-                      value={newTicket.title}
-                      onChange={(e) => setNewTicket({ ...newTicket, title: e.target.value })}
-                      className="bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-description">Description</Label>
-                    <Textarea
-                      id="ticket-description"
-                      placeholder="Feature description"
-                      value={newTicket.description}
-                      onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
-                      className="min-h-[100px] bg-white"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAddTicket} className="bg-blue-400 hover:bg-blue-300 text-white">Add</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <DragDropContext onDragEnd={onDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full h-full px-2">
-              {columns.map((column) => {
-                const filteredTickets = filterTickets(column.tickets)
-                return (
-                  <div key={column.id} className="space-y-4">
-                    <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">
-                      <h3 className="font-medium text-slate-900 dark:text-white flex items-center justify-between">
-                        {column.title}
-                        <Badge variant="outline">{filteredTickets.length}</Badge>
-                      </h3>
-                    </div>
-
-                    <Droppable droppableId={column.id} type="ticket">
-                      {(provided) => (
-                        <div
-                          {...provided.droppableProps}
-                          ref={provided.innerRef}
-                          className="space-y-3 overflow-y-auto h-[calc(100vh-220px)] no-scrollbar pb-20"
-                        >
-                          {filteredTickets.map((ticket, index) => (
-                            <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
-                              {(provided) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  id={`ticket-${ticket.id}`}
-                                  className="shadow-sm hover:shadow-md transition-shadow mb-4"
-                                >
-                                  <Card className="shadow-sm hover:shadow-md transition-shadow">
-                                    <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between">
-                                      <div className="flex items-center gap-2 flex-1">
-                                        <button
-                                          onClick={() => toggleTicketExpanded(ticket.id)}
-                                          className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                                          aria-label={isTicketExpanded(ticket.id) ? "Collapse ticket" : "Expand ticket"}
-                                        >
-                                          {isTicketExpanded(ticket.id) ? (
-                                            <ChevronDown className="h-4 w-4" />
-                                          ) : (
-                                            <ChevronRight className="h-4 w-4" />
-                                          )}
-                                        </button>
-                                        <CardTitle className="text-base">
-                                          {ticket.title}
-                                          <Badge
-                                            variant="outline"
-                                            className="ml-2 text-xs"
-                                            title="Number of sub-tickets"
-                                          >
-                                            {ticket.subTickets.length}
-                                          </Badge>
-                                        </CardTitle>
-                                      </div>
-                                      {/* Menu supprimé */}
-                                    </CardHeader>
-
-                                    <CardContent className="p-4 pt-0">
-                                      <div className="group relative">
-                                        <CardDescription className="text-sm text-slate-600 dark:text-slate-300">
-                                          {ticket.description}
-                                        </CardDescription>
-                                      </div>
-                                    </CardContent>
-
-                                    {/* Sub-tickets section */}
-                                    {isTicketExpanded(ticket.id) && (
-                                      <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3">
-                                        <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-2">
-                                          Sub-tickets{" "}
-                                          {ticket.subTickets.length > 0 ? `(${ticket.subTickets.length})` : ""}
-                                        </h4>
-                                        {ticket.subTickets.length > 0 && (
-                                          <Droppable droppableId={`subtickets-${ticket.id}`} type="subticket">
-                                            {(provided) => (
-                                              <div
-                                                {...provided.droppableProps}
-                                                ref={provided.innerRef}
-                                                className="space-y-2 mb-2"
-                                              >
-                                                {ticket.subTickets.map((subTicket, subIndex) => (
-                                                  <Draggable
-                                                    key={subTicket.id}
-                                                    draggableId={subTicket.id}
-                                                    index={subIndex}
-                                                  >
-                                                    {(provided) => (
-                                                      <div
-                                                        ref={provided.innerRef}
-                                                        {...provided.draggableProps}
-                                                        {...provided.dragHandleProps}
-                                                        className="bg-slate-50 dark:bg-slate-800 rounded-md p-2 border border-slate-200 dark:border-slate-700"
-                                                      >
-                                                        <div className="flex flex-col">
-                                                          <div className="flex items-start justify-between">
-                                                            <div className="flex-1">
-                                                              <h5 className="text-sm font-medium text-slate-900 dark:text-white">
-                                                                {subTicket.title}
-                                                              </h5>
-                                                              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                                                                {subTicket.description}
-                                                              </p>
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="flex justify-end gap-1 mt-2 pt-1 border-t border-slate-200 dark:border-slate-700">
-                                                            <Button
-                                                              variant="ghost"
-                                                              size="sm"
-                                                              className="h-5 text-xs"
-                                                              onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleStartDirectEditSubTicket(ticket.id, subTicket)
-                                                              }}
-                                                              title="Edit sub-ticket"
-                                                            >
-                                                              <Edit className="h-3 w-3 mr-1" />
-                                                              Edit
-                                                            </Button>
-                                                            <Button
-                                                              variant="ghost"
-                                                              size="sm"
-                                                              className="h-5 text-xs"
-                                                              onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleCopySubTicketText(subTicket)
-                                                              }}
-                                                              title="Copy sub-ticket content"
-                                                            >
-                                                              <Copy className="h-3 w-3 mr-1" />
-                                                              Copy
-                                                            </Button>
-                                                            <Button
-                                                              variant="ghost"
-                                                              size="sm"
-                                                              className="h-5 text-xs"
-                                                              onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleGenerateSubTicketAiDescription(ticket, subTicket)
-                                                              }}
-                                                              title="Enhance with AI"
-                                                            >
-                                                              <RefreshCw className="h-3 w-3 mr-1" />
-                                                              AI
-                                                            </Button>
-                                                          </div>
-                                                        </div>
-                                                      </div>
-                                                    )}
-                                                  </Draggable>
-                                                ))}
-                                                {provided.placeholder}
-                                              </div>
-                                            )}
-                                          </Droppable>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {columns.map((column) => (
+            <div key={column.id} className="space-y-4">
+              <div className="bg-secondary/20 p-3 rounded-lg">
+                <h2 className="font-semibold mb-2 flex items-center">
+                  <span className="mr-2">{column.title}</span>
+                  <Badge variant="outline">{column.tickets.length}</Badge>
+                </h2>
+                <Droppable droppableId={column.id} type="ticket">
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="space-y-2 min-h-[200px]"
+                    >
+                      {column.tickets.map((ticket, index) => (
+                        <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
+                          {(provided) => (
+                            <Card
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className="mb-2"
+                            >
+                              <CardHeader className="p-3 pb-0">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex items-center w-full">
+                                    {ticket.subTickets && ticket.subTickets.length > 0 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 mr-1"
+                                        onClick={() => toggleTicketExpanded(ticket.id)}
+                                      >
+                                        {isTicketExpanded(ticket.id) ? (
+                                          <ChevronDown className="h-4 w-4" />
+                                        ) : (
+                                          <ChevronRight className="h-4 w-4" />
                                         )}
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="w-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                                          onClick={() => {
-                                            setSelectedTicket(ticket)
-                                            setNewSubTicket({ title: "", description: "" })
-                                            setIsSubTicketDialogOpen(true)
-                                          }}
-                                        >
-                                          <Plus className="h-3 w-3 mr-1" />
-                                          Add Sub-ticket
-                                        </Button>
-                                      </div>
+                                      </Button>
                                     )}
-
-                                    <CardFooter className="p-2 flex justify-end gap-1 border-t">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleStartDirectEdit(ticket)
-                                        }}
-                                        title="Edit description"
-                                      >
-                                        <Edit className="h-4 w-4 mr-1" />
-                                        Edit
+                                    <CardTitle className="text-sm font-medium">{ticket.title}</CardTitle>
+                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreHorizontal className="h-4 w-4" />
                                       </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleCopyTicketText(ticket)
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setEditingTicket(ticket)
+                                          setIsEditDialogOpen(true)
                                         }}
-                                        title="Copy ticket content"
                                       >
-                                        <Copy className="h-4 w-4 mr-1" />
-                                        Copy
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleGenerateMainTicketAiDescription(ticket)
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Modifier
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setSelectedTicket(ticket)
+                                          setIsSubTicketDialogOpen(true)
                                         }}
-                                        title="Enhance with AI"
                                       >
-                                        <RefreshCw className="h-4 w-4 mr-1" />
-                                        AI
-                                      </Button>
-                                    </CardFooter>
-                                  </Card>
+                                        <ListPlus className="mr-2 h-4 w-4" />
+                                        Ajouter un sous-ticket
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => handleDeleteTicket(ticket.id)}>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Supprimer
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
-                  </div>
-                )
-              })}
-            </div>
-          </DragDropContext>
-        </TabsContent>
-
-        <TabsContent value="list" className="w-full flex-1 overflow-hidden">
-          <Card>
-            <CardContent className="p-6 overflow-y-auto h-[calc(100vh-220px)] pb-24">
-              <div className="space-y-6">
-                {/* Afficher tous les tickets sans les regrouper par colonnes */}
-                <div>
-                  <div className="space-y-3">
-                    {columns
-                      .flatMap((column) => column.tickets)
-                      .filter(
-                        (ticket) =>
-                          !searchQuery.trim() || ticket.title.toLowerCase()[0] === searchQuery.toLowerCase().trim()[0],
-                      )
-                      .map((ticket) => (
-                        <div key={ticket.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => toggleTicketExpanded(ticket.id)}
-                                  className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                                >
-                                  {isTicketExpanded(ticket.id) ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                  )}
-                                </button>
-                                <h4 className="font-medium">
-                                  {ticket.title}
-                                  <Badge variant="outline" className="ml-2 text-xs">
-                                    {ticket.subTickets.length}
-                                  </Badge>
-                                </h4>
-                              </div>
-                              <p className="text-slate-600 dark:text-slate-300 mt-1 ml-6">{ticket.description}</p>
-
-                              {/* Sub-tickets in list view */}
-                              {isTicketExpanded(ticket.id) && (
-                                <div className="ml-6 mt-3 space-y-2">
-                                  <h5 className="text-sm font-medium text-slate-900 dark:text-white">
-                                    Sub-tickets {ticket.subTickets.length > 0 ? `(${ticket.subTickets.length})` : ""}:
-                                  </h5>
-                                  {ticket.subTickets.length > 0 && (
-                                    <div className="space-y-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
-                                      {ticket.subTickets.map((subTicket) => (
+                              </CardHeader>
+                              <CardContent className="p-3 pt-1">
+                                <CardDescription className="text-xs">
+                                  {ticket.description ? ticket.description.substring(0, 100) + (ticket.description.length > 100 ? "..." : "") : "Aucune description"}
+                                </CardDescription>
+                              </CardContent>
+                              {ticket.subTickets && ticket.subTickets.length > 0 && isTicketExpanded(ticket.id) && (
+                                <CardFooter className="p-3 pt-0">
+                                  <div className="w-full">
+                                    <h4 className="text-xs font-medium mb-2">Sous-tickets ({ticket.subTickets.length})</h4>
+                                    <Droppable droppableId={`subtickets-${ticket.id}`} type="subticket">
+                                      {(provided) => (
                                         <div
-                                          key={subTicket.id}
-                                          className="bg-slate-50 dark:bg-slate-800 rounded-md p-2 border border-slate-200 dark:border-slate-700"
+                                          ref={provided.innerRef}
+                                          {...provided.droppableProps}
+                                          className="space-y-2"
                                         >
-                                          <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                              <h6 className="text-sm font-medium text-slate-900 dark:text-white">
-                                                {subTicket.title}
-                                              </h6>
-                                              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                                                {subTicket.description}
-                                              </p>
-                                            </div>
-                                            <div className="flex gap-1">
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 w-6 p-0"
-                                                onClick={() => handleStartDirectEditSubTicket(ticket.id, subTicket)}
-                                              >
-                                                <Edit className="h-3 w-3" />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 w-6 p-0"
-                                                onClick={() => handleCopySubTicketText(subTicket)}
-                                              >
-                                                <Copy className="h-3 w-3" />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 w-6 p-0"
-                                                onClick={() => handleGenerateSubTicketAiDescription(ticket, subTicket)}
-                                                title="Enhance with AI"
-                                              >
-                                                <RefreshCw className="h-3 w-3" />
-                                              </Button>
-                                              <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                                    <MoreHorizontal className="h-3 w-3" />
-                                                  </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                  <DropdownMenuItem
-                                                    onClick={() => handleStartDirectEditSubTicket(ticket.id, subTicket)}
-                                                  >
-                                                    <Edit className="h-4 w-4 mr-2" />
-                                                    Edit
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuItem
-                                                    onClick={() => handleCopySubTicket(ticket.id, subTicket)}
-                                                  >
-                                                    <Copy className="h-4 w-4 mr-2" />
-                                                    Duplicate
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuItem onClick={() => handleCopySubTicketText(subTicket)}>
-                                                    <MessageSquare className="h-4 w-4 mr-2" />
-                                                    Copy text
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuItem
-                                                    onClick={() => handleDeleteSubTicket(ticket.id, subTicket.id)}
-                                                    className="text-red-600 focus:text-red-600"
-                                                  >
-                                                    <Trash2 className="h-4 w-4 mr-2" />
-                                                    Delete
-                                                  </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                              </DropdownMenu>
-                                            </div>
-                                          </div>
+                                          {ticket.subTickets.map((subTicket, subIndex) => (
+                                            <Draggable
+                                              key={subTicket.id}
+                                              draggableId={subTicket.id}
+                                              index={subIndex}
+                                            >
+                                              {(provided) => (
+                                                <div
+                                                  ref={provided.innerRef}
+                                                  {...provided.draggableProps}
+                                                  {...provided.dragHandleProps}
+                                                  className="bg-background border rounded p-2 text-xs"
+                                                >
+                                                  <div className="flex justify-between items-start">
+                                                    <span>{subTicket.title}</span>
+                                                    <DropdownMenu>
+                                                      <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                          <MoreHorizontal className="h-3 w-3" />
+                                                        </Button>
+                                                      </DropdownMenuTrigger>
+                                                      <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem
+                                                          onClick={() => {
+                                                            setEditingSubTicket({
+                                                              parentId: ticket.id,
+                                                              subTicket,
+                                                            })
+                                                            setIsSubTicketEditDialogOpen(true)
+                                                          }}
+                                                        >
+                                                          <Edit className="mr-2 h-3 w-3" />
+                                                          Modifier
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleDeleteTicket(subTicket.id)}>
+                                                          <Trash2 className="mr-2 h-3 w-3" />
+                                                          Supprimer
+                                                        </DropdownMenuItem>
+                                                      </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                  </div>
+                                                  {subTicket.description && (
+                                                    <p className="mt-1 text-muted-foreground">
+                                                      {subTicket.description.substring(0, 50)}
+                                                      {subTicket.description.length > 50 ? "..." : ""}
+                                                    </p>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </Draggable>
+                                          ))}
+                                          {provided.placeholder}
                                         </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                                    onClick={() => {
-                                      setSelectedTicket(ticket)
-                                      setNewSubTicket({ title: "", description: "" })
-                                      setIsSubTicketDialogOpen(true)
-                                    }}
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    Add Sub-ticket
-                                  </Button>
-                                </div>
+                                      )}
+                                    </Droppable>
+                                  </div>
+                                </CardFooter>
                               )}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleCopyTicketText(ticket)
-                                }}
-                                title="Copy ticket content"
-                                className="h-8"
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                    <span className="sr-only">Open menu</span>
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setEditingTicket(ticket)
-                                      setEditingSubTicket(null)
-                                      setIsEditDialogOpen(true)
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setSelectedTicket(ticket)
-                                      setNewSubTicket({ title: "", description: "" })
-                                      setIsSubTicketDialogOpen(true)
-                                    }}
-                                  >
-                                    <ListPlus className="h-4 w-4 mr-2" />
-                                    Add Sub-ticket
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleCopyTicket(ticket)}>
-                                    <Copy className="h-4 w-4 mr-2" />
-                                    Duplicate
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleCopyTicketText(ticket)}>
-                                    <MessageSquare className="h-4 w-4 mr-2" />
-                                    Copy text
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteTicket(ticket.id)}
-                                    className="text-red-600 focus:text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                        </div>
+                            </Card>
+                          )}
+                        </Draggable>
                       ))}
-                    {columns.flatMap((column) => column.tickets).length === 0 && (
-                      <p className="text-slate-500 dark:text-slate-400 italic">No tickets available</p>
-                    )}
-                  </div>
-                </div>
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          ))}
+        </div>
+      </DragDropContext>
 
-      {/* AI Description Dialog */}
-      <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>AI-Enhanced Description</DialogTitle>
-            <DialogDescription>
-              Gemini has analyzed your ticket and generated an enhanced description.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {isGeneratingSuggestion ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                <p>Generating enhanced description with Gemini...</p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="original-description">Original Description</Label>
-                  <div className="p-3 bg-white rounded-md text-sm text-blue-500 border border-blue-400/30">
-                    {selectedTicket?.description}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ai-description">AI-Enhanced Description</Label>
-                  <div className="p-3 bg-white rounded-md text-sm text-blue-500 border border-blue-400/30 min-h-[150px]">
-                    {generatedDescription}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAiDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleApplyGeneratedDescription}
-              disabled={isGeneratingSuggestion || !generatedDescription}
-              className="bg-blue-400 hover:bg-blue-300 text-white"
-            >
-              Apply Enhanced Description
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Direct Edit Dialog */}
-      <Dialog open={isDirectEditDialogOpen} onOpenChange={setIsDirectEditDialogOpen}>
+      {/* Dialog for creating a new ticket */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Description</DialogTitle>
-            <DialogDescription>Edit the ticket description below.</DialogDescription>
+            <DialogTitle>Créer un nouveau ticket</DialogTitle>
+            <DialogDescription>Ajoutez un nouveau ticket à votre tableau Kanban.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="direct-edit-description">Description</Label>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="title">Titre</Label>
+              <Input
+                id="title"
+                value={newTicket.title}
+                onChange={(e) => setNewTicket({ ...newTicket, title: e.target.value })}
+                placeholder="Titre du ticket"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
               <Textarea
-                id="direct-edit-description"
-                placeholder="Ticket description"
-                value={directEditingText}
-                onChange={(e) => setDirectEditingText(e.target.value)}
-                className="min-h-[150px] bg-white"
+                id="description"
+                value={newTicket.description}
+                onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
+                placeholder="Description du ticket"
+                rows={4}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsDirectEditDialogOpen(false)
-                setDirectEditingTicketId(null)
-              }}
-            >
-              Cancel
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Annuler
             </Button>
-            <Button
-              onClick={() => {
-                if (directEditingTicketId) {
-                  handleSaveDirectEdit(directEditingTicketId)
-                  setIsDirectEditDialogOpen(false)
-                }
-              }}
-              className="bg-blue-400 hover:bg-blue-300 text-white"
-            >
-              Save
+            <Button onClick={handleCreateTicket} disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Créer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Sub-ticket Edit Dialog */}
+      {/* Dialog for creating a sub-ticket */}
+      <Dialog open={isSubTicketDialogOpen} onOpenChange={setIsSubTicketDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un sous-ticket</DialogTitle>
+            <DialogDescription>
+              Ajoutez un sous-ticket à "{selectedTicket?.title}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="subTicketTitle">Titre</Label>
+              <Input
+                id="subTicketTitle"
+                value={newSubTicket.title}
+                onChange={(e) => setNewSubTicket({ ...newSubTicket, title: e.target.value })}
+                placeholder="Titre du sous-ticket"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="subTicketDescription">Description</Label>
+              <Textarea
+                id="subTicketDescription"
+                value={newSubTicket.description}
+                onChange={(e) => setNewSubTicket({ ...newSubTicket, description: e.target.value })}
+                placeholder="Description du sous-ticket"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSubTicketDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleCreateSubTicket} disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Ajouter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for editing a ticket */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier le ticket</DialogTitle>
+            <DialogDescription>Modifiez les détails du ticket.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="editTitle">Titre</Label>
+              <Input
+                id="editTitle"
+                value={editingTicket?.title || ""}
+                onChange={(e) => setEditingTicket(editingTicket ? { ...editingTicket, title: e.target.value } : null)}
+                placeholder="Titre du ticket"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editDescription">Description</Label>
+              <Textarea
+                id="editDescription"
+                value={editingTicket?.description || ""}
+                onChange={(e) =>
+                  setEditingTicket(editingTicket ? { ...editingTicket, description: e.target.value } : null)
+                }
+                placeholder="Description du ticket"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleEditTicket} disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for editing a sub-ticket */}
       <Dialog open={isSubTicketEditDialogOpen} onOpenChange={setIsSubTicketEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Sub-ticket</DialogTitle>
-            <DialogDescription>Edit the sub-ticket description below.</DialogDescription>
+            <DialogTitle>Modifier le sous-ticket</DialogTitle>
+            <DialogDescription>Modifiez les détails du sous-ticket.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="subticket-edit-description">Description</Label>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="editSubTicketTitle">Titre</Label>
+              <Input
+                id="editSubTicketTitle"
+                value={editingSubTicket?.subTicket.title || ""}
+                onChange={(e) =>
+                  setEditingSubTicket(
+                    editingSubTicket
+                      ? {
+                          ...editingSubTicket,
+                          subTicket: { ...editingSubTicket.subTicket, title: e.target.value },
+                        }
+                      : null
+                  )
+                }
+                placeholder="Titre du sous-ticket"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editSubTicketDescription">Description</Label>
               <Textarea
-                id="subticket-edit-description"
-                placeholder="Sub-ticket description"
-                value={directEditingSubTicketText}
-                onChange={(e) => setDirectEditingSubTicketText(e.target.value)}
-                className="min-h-[150px] bg-white"
+                id="editSubTicketDescription"
+                value={editingSubTicket?.subTicket.description || ""}
+                onChange={(e) =>
+                  setEditingSubTicket(
+                    editingSubTicket
+                      ? {
+                          ...editingSubTicket,
+                          subTicket: { ...editingSubTicket.subTicket, description: e.target.value },
+                        }
+                      : null
+                  )
+                }
+                placeholder="Description du sous-ticket"
+                rows={4}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsSubTicketEditDialogOpen(false)
-                setDirectEditingSubTicketId(null)
-                setDirectEditingSubTicketParentId(null)
-              }}
-            >
-              Cancel
+            <Button variant="outline" onClick={() => setIsSubTicketEditDialogOpen(false)}>
+              Annuler
             </Button>
-            <Button
-              onClick={() => {
-                if (directEditingSubTicketId && directEditingSubTicketParentId) {
-                  handleSaveDirectEditSubTicket(directEditingSubTicketParentId, directEditingSubTicketId)
-                }
-              }}
-              className="bg-blue-400 hover:bg-blue-300 text-white"
-            >
-              Save
+            <Button onClick={handleEditSubTicket} disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Toaster />
     </div>
   )
 }
-
-// Ajouter un style pour l'effet de surbrillance et la barre de défilement
-const highlightStyle = `
-  @keyframes highlight {
-    0% { background-color: rgba(124, 58, 237, 0.1); }
-    100% { background-color: transparent; }
-  }
-  .highlight-ticket {
-    animation: highlight 2s ease-out;
-    background-color: rgba(124, 58, 237, 0.05);
-  }
-
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 3px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(124, 58, 237, 0.3);
-    border-radius: 3px;
-    transition: background 0.2s ease;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(124, 58, 237, 0.5);
-  }
-  .dark .scrollbar-thin::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-  }
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(124, 58, 237, 0.4);
-  }
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(124, 58, 237, 0.6);
-  }
-
-  /* Styles pour déplacer la barre de défilement à gauche */
-  .scrollbar-left {
-    direction: rtl;
-  }
-  .scrollbar-left > * {
-    direction: ltr;
-  }
-
-  /* Hide scrollbar but keep functionality */
-  .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
-  }
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari and Opera */
-  }
-`
-
-// Exporter à la fois comme exportation nommée et par défaut
-export default KanbanBoard

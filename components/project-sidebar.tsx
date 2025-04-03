@@ -37,10 +37,20 @@ export function ProjectSidebar() {
     router.push("/")
   }
 
+  // Fonction pour effacer tous les projets (à utiliser pour le développement)
+  const clearAllProjects = () => {
+    localStorage.removeItem("skwerd-projects")
+    setRecentProjects([])
+    setOlderProjects([])
+  }
+
   // Charger les projets une seule fois au montage du composant
   useEffect(() => {
     if (isMounted.current) return
     isMounted.current = true
+
+    // Effacer les projets existants (à supprimer en production)
+    clearAllProjects()
 
     // Fonction pour charger les projets
     const loadProjects = () => {
@@ -51,42 +61,6 @@ export function ProjectSidebar() {
 
         if (storedProjects) {
           projectsList = JSON.parse(storedProjects)
-        }
-
-        // Si aucun projet n'est stocké, créer des exemples
-        if (!projectsList || projectsList.length === 0) {
-          projectsList = [
-            {
-              id: "1",
-              name: "Task Management Application",
-              date: "Today",
-              goal: "Create an application to manage daily tasks",
-            },
-            {
-              id: "2",
-              name: "E-commerce Website",
-              date: "Today",
-              goal: "Develop an online sales platform",
-            },
-            { id: "3", name: "Analytics Dashboard", date: "Yesterday", goal: "Visualize analytics data" },
-            { id: "4", name: "REST API", date: "Yesterday", goal: "Create an API for the mobile application" },
-            {
-              id: "5",
-              name: "Mobile Application",
-              date: "3 days",
-              goal: "Develop a cross-platform mobile application",
-            },
-            {
-              id: "6",
-              name: "Authentication System",
-              date: "5 days",
-              goal: "Implement a secure authentication system",
-            },
-            { id: "7", name: "Blog Platform", date: "7 days", goal: "Create a blog platform with CMS" },
-          ]
-
-          // Sauvegarder les exemples dans localStorage
-          localStorage.setItem("skwerd-projects", JSON.stringify(projectsList))
         }
 
         // Séparer les projets récents et plus anciens
@@ -201,7 +175,7 @@ export function ProjectSidebar() {
 
           {olderProjects.length > 0 && (
             <div className="px-3 py-2">
-              <h3 className="text-xs font-medium text-blue-400 mb-2">Previous 7 days</h3>
+              <h3 className="text-xs font-medium text-blue-400 mb-2">Older</h3>
               <ul className="space-y-1">
                 {olderProjects.map((project) => (
                   <li key={project.id}>
@@ -226,32 +200,17 @@ export function ProjectSidebar() {
           )}
         </div>
 
-        {/* User profile section */}
-        <div className="mt-auto border-t border-blue-400/30 p-3">
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-1">
-              <SettingsDialog />
-              <button
-                onClick={handleSignOut}
-                className="text-sm text-blue-500 hover:text-blue-600 flex items-center justify-between p-2 rounded-md hover:bg-blue-50"
-              >
-                <span>Sign out</span>
-                <LogOut className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex items-center gap-3 p-2">
-              <div className="h-10 w-10 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center text-blue-500 font-medium">
-                <img
-                  src="/placeholder.svg?height=40&width=40"
-                  alt="User profile"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-medium text-sm text-blue-600">John Doe</span>
-              </div>
-            </div>
-          </div>
+        <div className="p-3 mt-auto">
+          <SettingsDialog />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-blue-500 hover:bg-blue-100/50 hover:text-blue-600"
+            onClick={handleSignOut}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
         </div>
       </div>
     </div>

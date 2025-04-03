@@ -1,5 +1,6 @@
 {
-  "/api/login/route": "app/api/login/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/projects/user/route": "app/api/projects/user/route.js",
   "/page": "app/page.js",
   "/login/page": "app/login/page.js",
   "/kanban/page": "app/kanban/page.js"
