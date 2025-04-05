@@ -291,11 +291,13 @@ export default function KanbanBoard({
 
     setIsLoading(true)
     try {
+      const firstColumnId = columns.length > 0 ? parseInt(columns[0].id.replace('column-', '')) : 1;
+      
       // Créer le ticket dans la base de données
       const createdTicket = await onCreateTicket({
         title: newTicket.title,
         description: newTicket.description,
-        statusId: 1, // "To Do" par défaut
+        statusId: firstColumnId, // Use the first column (To Do) dynamically
         projectId: parseInt(projectId),
         isSubTicket: false
       })
@@ -333,6 +335,10 @@ export default function KanbanBoard({
 
     setIsLoading(true)
     try {
+      const parentId = typeof selectedTicket.id === 'string' 
+        ? parseInt(selectedTicket.id) 
+        : (typeof selectedTicket.id === 'number' ? selectedTicket.id : 0);
+        
       // Créer le sous-ticket dans la base de données
       const createdSubTicket = await onCreateTicket({
         title: newSubTicket.title,
@@ -340,8 +346,28 @@ export default function KanbanBoard({
         statusId: selectedTicket.statusId,
         projectId: parseInt(projectId),
         isSubTicket: true,
-        parentTicketId: parseInt(selectedTicket.id)
+        parentTicketId: parentId
       })
+
+      const newColumns = [...columns];
+      for (const column of newColumns) {
+        const ticketIndex = column.tickets.findIndex(t => t.id === selectedTicket.id);
+        if (ticketIndex !== -1) {
+          if (!column.tickets[ticketIndex].subTickets) {
+            column.tickets[ticketIndex].subTickets = [];
+          }
+          column.tickets[ticketIndex].subTickets.push({
+            id: createdSubTicket.id.toString(),
+            title: createdSubTicket.title,
+            description: createdSubTicket.description || "",
+            statusId: createdSubTicket.statusId,
+            isSubTicket: true,
+            parentTicketId: parentId
+          } as SubTicket);
+          break;
+        }
+      }
+      setColumns(newColumns);
 
       setIsSubTicketDialogOpen(false)
       setNewSubTicket({ title: "", description: "" })
