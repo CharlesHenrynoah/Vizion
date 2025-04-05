@@ -3,7 +3,7 @@
 import { DialogTrigger } from "@/components/ui/dialog"
 
 import { useState, useEffect } from "react"
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
+import { DragDropContext, Droppable, Draggable, DroppableProvided, DraggableProvided } from "@hello-pangea/dnd"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -151,10 +151,11 @@ export default function KanbanBoard({
 
   // Toggle expanded state for a ticket
   const toggleTicketExpanded = (ticketId: string) => {
-    setExpandedTickets((prev) => ({
-      ...prev,
-      [ticketId]: !prev[ticketId],
-    }))
+    setExpandedTickets((prev) => {
+      const newState = { ...prev };
+      newState[ticketId] = !prev[ticketId];
+      return newState;
+    });
   }
 
   // Check if a ticket is expanded
@@ -174,24 +175,24 @@ export default function KanbanBoard({
     // Handle main ticket drag between columns
     if (type === "ticket") {
       // Find the source and destination columns
-      const sourceColumn = columns.find((col) => col.id === source.droppableId)
-      const destColumn = columns.find((col) => col.id === destination.droppableId)
+      const sourceColumn = columns.find((col: ColumnType) => col.id === source.droppableId)
+      const destColumn = columns.find((col: ColumnType) => col.id === destination.droppableId)
 
       if (!sourceColumn || !destColumn) return
 
       // Find the ticket being moved
-      const ticket = sourceColumn.tickets.find((t) => t.id === draggableId)
+      const ticket = sourceColumn.tickets.find((t: Ticket) => t.id === draggableId)
       if (!ticket) return
 
       // Create new arrays for the columns
       const newColumns = [...columns]
-      const newSourceCol = newColumns.find((col) => col.id === source.droppableId)
-      const newDestCol = newColumns.find((col) => col.id === destination.droppableId)
+      const newSourceCol = newColumns.find((col: ColumnType) => col.id === source.droppableId)
+      const newDestCol = newColumns.find((col: ColumnType) => col.id === destination.droppableId)
 
       if (!newSourceCol || !newDestCol) return
 
       // Remove from source column
-      newSourceCol.tickets = newSourceCol.tickets.filter((t) => t.id !== draggableId)
+      newSourceCol.tickets = newSourceCol.tickets.filter((t: Ticket) => t.id !== draggableId)
 
       // Add to destination column
       const newTickets = Array.from(newDestCol.tickets)
@@ -235,7 +236,7 @@ export default function KanbanBoard({
 
       // Find the parent ticket
       for (const column of newColumns) {
-        const tIndex = column.tickets.findIndex((t) => t.id === parentTicketId)
+        const tIndex = column.tickets.findIndex((t: Ticket) => t.id === parentTicketId)
 
         if (tIndex !== -1) {
           parentTicket = column.tickets[tIndex]
@@ -837,11 +838,13 @@ export default function KanbanBoard({
     // Limiter la description à MAX_DESCRIPTION_LENGTH caractères
     const trimmedDescription = editableDescription.slice(0, MAX_DESCRIPTION_LENGTH)
     
-    setGeneratedSubTicket({
-      ...generatedSubTicket,
-      title: editableTitle,
-      description: trimmedDescription
-    })
+    if (generatedSubTicket) {
+      setGeneratedSubTicket({
+        ...generatedSubTicket,
+        title: editableTitle,
+        description: trimmedDescription
+      })
+    }
     
     setIsEditing(false)
   }
@@ -910,7 +913,7 @@ export default function KanbanBoard({
                   <Badge variant="outline">{column.tickets.length}</Badge>
                 </h2>
                 <Droppable droppableId={column.id} type="ticket">
-                  {(provided) => (
+                  {(provided: DroppableProvided) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
@@ -918,7 +921,7 @@ export default function KanbanBoard({
                     >
                       {column.tickets.map((ticket, index) => (
                         <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
-                          {(provided) => (
+                          {(provided: DraggableProvided) => (
                             <Card
                               ref={provided.innerRef}
                               {...provided.draggableProps}
@@ -996,7 +999,7 @@ export default function KanbanBoard({
                                   <div className="w-full">
                                     <h4 className="text-xs font-medium mb-2">Sous-tickets ({ticket.subTickets.length})</h4>
                                     <Droppable droppableId={`subtickets-${ticket.id}`} type="subticket">
-                                      {(provided) => (
+                                      {(provided: DroppableProvided) => (
                                         <div
                                           ref={provided.innerRef}
                                           {...provided.droppableProps}
@@ -1008,7 +1011,7 @@ export default function KanbanBoard({
                                               draggableId={subTicket.id}
                                               index={subIndex}
                                             >
-                                              {(provided) => (
+                                              {(provided: DraggableProvided) => (
                                                 <div
                                                   ref={provided.innerRef}
                                                   {...provided.draggableProps}
