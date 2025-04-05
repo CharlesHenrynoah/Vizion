@@ -501,13 +501,13 @@ export async function generateSubTicketWithAI(
     Voici la description du sous-ticket que je veux créer: "${subTicketDescription}"
     
     Génère un sous-ticket technique approprié au format JSON avec les champs suivants:
-    - title: Le titre doit suivre ce format exact: "Ticket [Num Epic].X (Domaine) : Description concise". 
-      Par exemple "Ticket 1.3 (Frontend) : Implémenter la validation de formulaire"
+    - title: Le titre doit suivre ce format exact: "Ticket Num.X (Domaine) Description concise". 
+      Par exemple "Ticket 1.3 (Frontend) Implémenter la validation de formulaire"
     - description: Une description technique et actionnable avec des étapes précises
     - priority: Un nombre entre 1 (basse) et 3 (haute) pour représenter la priorité du ticket
     
     IMPORTANT :
-    - Le titre DOIT respecter exactement le format spécifié
+    - Le titre DOIT respecter exactement le format spécifié, sans crochets et sans deux-points
     - La description DOIT être technique, précise et actionnable
     - La description DOIT faire environ ${TARGET_DESCRIPTION_LENGTH} caractères (entre 450 et 550)
     - La description NE DOIT JAMAIS dépasser ${MAX_DESCRIPTION_LENGTH} caractères
@@ -554,7 +554,7 @@ export async function generateSubTicketWithAI(
         
         // Créer un objet par défaut si le parsing échoue
         ticketData = {
-          title: `Ticket X.X : ${subTicketDescription.substring(0, 50)}...`,
+          title: `Ticket X.X (Backend) ${subTicketDescription.substring(0, 50)}...`,
           description: `Sous-ticket créé à partir de: ${subTicketDescription.substring(0, 400)}`,
           priority: 2
         };
@@ -565,7 +565,7 @@ export async function generateSubTicketWithAI(
     // Vérifier les champs requis
     if (!ticketData.title) {
       console.warn("Titre manquant dans la réponse, création d'un titre par défaut");
-      ticketData.title = `Ticket X.X : ${subTicketDescription.substring(0, 50)}...`;
+      ticketData.title = `Ticket X.X (Backend) ${subTicketDescription.substring(0, 50)}...`;
     }
     
     if (!ticketData.description) {
@@ -578,12 +578,12 @@ export async function generateSubTicketWithAI(
     const epicNumber = epicNumberMatch ? epicNumberMatch[1] : "X";
     
     // Formater correctement le titre
-    ticketData.title = ticketData.title.replace(/\[\d*\]\.X/i, `[${epicNumber}].X`);
+    ticketData.title = ticketData.title.replace(/\[\d*\]\.X/i, `${epicNumber}.X`);
     
     // S'assurer que le titre a un format correct
-    if (!ticketData.title.match(/Ticket\s+\[\w+\]\.X/i)) {
+    if (!ticketData.title.match(/Ticket\s+\d+\.\d+\s+\(\w+\)/i)) {
       console.warn("Format de titre incorrect, correction");
-      ticketData.title = `Ticket [${epicNumber}].X : ${ticketData.title.substring(0, 50)}`;
+      ticketData.title = `Ticket ${epicNumber}.X (Backend) ${ticketData.title.substring(0, 50)}`;
     }
     
     // Assurer les valeurs par défaut
@@ -613,7 +613,7 @@ export async function generateSubTicketWithAI(
     
     // Créer un sous-ticket par défaut en cas d'erreur générale
     const fallbackTicket = {
-      title: `Ticket X.X : ${subTicketDescription.substring(0, 50)}...`,
+      title: `Ticket X.X (Backend) ${subTicketDescription.substring(0, 50)}...`,
       description: `Sous-ticket créé à partir de: ${subTicketDescription.substring(0, 400)}`,
       priority: 2,
       status: "To Do",

@@ -1,10 +1,11 @@
 {
-  "/api/tickets/route": "app/api/tickets/route.js",
-  "/api/projects/route": "app/api/projects/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/api/tickets/ai-subticket/generate/route": "app/api/tickets/ai-subticket/generate/route.js",
   "/api/tickets/ai-subticket/route": "app/api/tickets/ai-subticket/route.js",
-  "/create/page": "app/create/page.js",
-  "/login/page": "app/login/page.js",
+  "/api/projects/route": "app/api/projects/route.js",
+  "/api/tickets/route": "app/api/tickets/route.js",
   "/page": "app/page.js",
+  "/login/page": "app/login/page.js",
+  "/create/page": "app/create/page.js",
   "/kanban/page": "app/kanban/page.js"
 }
