@@ -9,23 +9,26 @@ import { X } from "lucide-react"
 type ProjectCreationModalProps = {
   onClose?: () => void
   standalone?: boolean
+  isCreatePage?: boolean
 }
 
-export function ProjectCreationModal({ onClose, standalone = false }: ProjectCreationModalProps) {
+export function ProjectCreationModal({ onClose, standalone = false, isCreatePage = false }: ProjectCreationModalProps) {
   const [hasProjects, setHasProjects] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    // Vérifier si l'utilisateur a des projets
+    if (isCreatePage) {
+      return
+    }
+    
     const storedProjects = localStorage.getItem("skwerd-projects")
     if (storedProjects) {
       const projectsList = JSON.parse(storedProjects)
       setHasProjects(projectsList.length > 0)
     }
-  }, [])
+  }, [isCreatePage])
 
-  // Si l'utilisateur a des projets et que ce n'est pas un mode standalone, ne pas afficher le modal
-  if (hasProjects && !standalone) {
+  if (hasProjects && !standalone && !isCreatePage) {
     return null
   }
 
@@ -33,8 +36,8 @@ export function ProjectCreationModal({ onClose, standalone = false }: ProjectCre
     <div className={`${standalone ? "" : "fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"}`}>
       <div className={`bg-white/90 rounded-lg shadow-xl ${standalone ? "w-full" : "w-full max-w-2xl mx-4"}`}>
         <div className="flex items-center justify-between p-4 border-b border-blue-400/30">
-          <h2 className="text-xl font-medium text-blue-500">Créez votre premier projet</h2>
-          {onClose && (
+          <h2 className="text-xl font-medium text-blue-500">Create Your Project</h2>
+          {onClose && !isCreatePage && (
             <Button
               variant="ghost"
               size="sm"
@@ -42,19 +45,21 @@ export function ProjectCreationModal({ onClose, standalone = false }: ProjectCre
               onClick={onClose}
             >
               <X className="h-5 w-5" />
-              <span className="sr-only">Fermer</span>
+              <span className="sr-only">Close</span>
             </Button>
           )}
         </div>
         <div className="p-6">
           <p className="text-blue-400 mb-6">
-            Décrivez votre projet pour générer automatiquement un tableau Kanban avec des tickets fonctionnels.
+            Describe your project to automatically generate a Kanban board with functional tickets.
           </p>
           <ProjectFormEnhanced onProjectCreated={() => {
-            // Rafraîchir la page après la création du projet pour recharger les données
+            if (isCreatePage) {
+              return
+            }
+            
             router.refresh()
             
-            // Si un callback onClose est fourni, l'appeler
             if (onClose) {
               onClose()
             }

@@ -3,49 +3,67 @@
     "40ca63b7f481f0a4637d6703757ade11dbc432b33f": {
       "workers": {
         "app/page": {
-          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/kanban/page": {
-          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%5D%5D%5D&__client_imported__=true!",
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260348a3d22f5fdc032b6f0c5e9a206f41ba92c7613%22%2C%22generateProjectTicketsFormatted%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%2260f5a7114ae525e767818b612bb897003e4c41d417%22%2C%22generateProjectTickets%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%2C%5B%2270fe2b21fda754924c839b23a029c64c76a56780ef%22%2C%22createProjectTicketsInDB%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         }
       },
       "layer": {
-        "app/page": "action-browser",
-        "app/kanban/page": "action-browser"
+        "app/page": "action-browser"
+      }
+    },
+    "60348a3d22f5fdc032b6f0c5e9a206f41ba92c7613": {
+      "workers": {
+        "app/page": {
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260348a3d22f5fdc032b6f0c5e9a206f41ba92c7613%22%2C%22generateProjectTicketsFormatted%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%2260f5a7114ae525e767818b612bb897003e4c41d417%22%2C%22generateProjectTickets%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%2C%5B%2270fe2b21fda754924c839b23a029c64c76a56780ef%22%2C%22createProjectTicketsInDB%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
       }
     },
     "60e43038304b949708f931d67e30ae56439d80a131": {
       "workers": {
         "app/page": {
-          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/kanban/page": {
-          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%5D%5D%5D&__client_imported__=true!",
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260348a3d22f5fdc032b6f0c5e9a206f41ba92c7613%22%2C%22generateProjectTicketsFormatted%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%2260f5a7114ae525e767818b612bb897003e4c41d417%22%2C%22generateProjectTickets%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%2C%5B%2270fe2b21fda754924c839b23a029c64c76a56780ef%22%2C%22createProjectTicketsInDB%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         }
       },
       "layer": {
-        "app/page": "action-browser",
-        "app/kanban/page": "action-browser"
+        "app/page": "action-browser"
+      }
+    },
+    "60f5a7114ae525e767818b612bb897003e4c41d417": {
+      "workers": {
+        "app/page": {
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260348a3d22f5fdc032b6f0c5e9a206f41ba92c7613%22%2C%22generateProjectTicketsFormatted%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%2260f5a7114ae525e767818b612bb897003e4c41d417%22%2C%22generateProjectTickets%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%2C%5B%2270fe2b21fda754924c839b23a029c64c76a56780ef%22%2C%22createProjectTicketsInDB%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
       }
     },
     "709c1ed9de5d27665d21214e67e5e216b62062f6e3": {
       "workers": {
         "app/page": {
-          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/kanban/page": {
-          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%5D%5D%5D&__client_imported__=true!",
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260348a3d22f5fdc032b6f0c5e9a206f41ba92c7613%22%2C%22generateProjectTicketsFormatted%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%2260f5a7114ae525e767818b612bb897003e4c41d417%22%2C%22generateProjectTickets%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%2C%5B%2270fe2b21fda754924c839b23a029c64c76a56780ef%22%2C%22createProjectTicketsInDB%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         }
       },
       "layer": {
-        "app/page": "action-browser",
-        "app/kanban/page": "action-browser"
+        "app/page": "action-browser"
+      }
+    },
+    "70fe2b21fda754924c839b23a029c64c76a56780ef": {
+      "workers": {
+        "app/page": {
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fcharles-henrynoah%2FDesktop%2Fvizion%2FVizion%2Fapp%2Factions%2Fgemini-integration.ts%22%2C%5B%5B%2240ca63b7f481f0a4637d6703757ade11dbc432b33f%22%2C%22generateWithGemini%22%5D%2C%5B%2260348a3d22f5fdc032b6f0c5e9a206f41ba92c7613%22%2C%22generateProjectTicketsFormatted%22%5D%2C%5B%2260e43038304b949708f931d67e30ae56439d80a131%22%2C%22enhanceProjectDescription%22%5D%2C%5B%2260f5a7114ae525e767818b612bb897003e4c41d417%22%2C%22generateProjectTickets%22%5D%2C%5B%22709c1ed9de5d27665d21214e67e5e216b62062f6e3%22%2C%22generateFeatureIdeas%22%5D%2C%5B%2270fe2b21fda754924c839b23a029c64c76a56780ef%22%2C%22createProjectTicketsInDB%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
       }
     }
   },

@@ -73,65 +73,130 @@ export async function findOrCreateOAuthUser(profile: any, provider: string) {
     }
 
     // Extraire les informations du profil en fonction du fournisseur
+    let userId = profile.id || profile.sub;
     let userName = profile.name;
     let userImage = profile.image || profile.picture || profile.avatar_url;
     
     // Traitement spécifique pour Google
     if (provider === 'google') {
+      // Pour Google, l'ID est généralement dans profile.sub
+      userId = profile.sub || userId;
       // Google fournit souvent le nom dans des propriétés séparées
       if (profile.given_name && profile.family_name) {
         userName = `${profile.given_name} ${profile.family_name}`;
       }
       // Google fournit l'image dans profile.picture
       userImage = profile.picture || userImage;
-      console.log('Informations extraites pour Google:', { userName, userImage, email: profile.email });
+      console.log('Informations extraites pour Google:', { userId, userName, userImage, email: profile.email });
     }
     
     // Traitement spécifique pour GitHub
     if (provider === 'github') {
+      // GitHub fournit l'ID dans profile.id
+      userId = profile.id || userId;
       // GitHub fournit l'image dans profile.avatar_url
       userImage = profile.avatar_url || userImage;
-      console.log('Informations extraites pour GitHub:', { userName, userImage, email: profile.email });
+      console.log('Informations extraites pour GitHub:', { userId, userName, userImage, email: profile.email });
     }
 
-    // Vérifier si l'utilisateur existe déjà
-    const { data: existingUser, error: searchError } = await supabase
+    if (!userId) {
+      console.error('Aucun ID utilisateur trouvé dans le profil OAuth');
+      throw new Error('Aucun ID utilisateur trouvé dans le profil OAuth');
+    }
+
+    // D'abord, essayons de trouver l'utilisateur par ID
+    const { data: existingUserById, error: idSearchError } = await supabase
       .from('users')
       .select('id, email, name, avatar')
-      .eq('email', profile.email)
-      .single();
+      .eq('id', userId)
+      .maybeSingle();
 
-    if (searchError && searchError.code !== 'PGRST116') { // PGRST116 = not found
-      console.error('Erreur lors de la recherche de l\'utilisateur:', searchError);
-      throw searchError;
+    if (idSearchError) {
+      console.error('Erreur lors de la recherche de l\'utilisateur par ID:', idSearchError);
     }
 
-    // Si l'utilisateur existe, le retourner
-    if (existingUser) {
-      console.log('Utilisateur existant trouvé:', existingUser);
+    // Si l'utilisateur existe par ID, le retourner immédiatement
+    if (existingUserById) {
+      console.log('Utilisateur existant trouvé par ID:', existingUserById);
       return {
-        id: existingUser.id,
-        email: existingUser.email,
-        name: existingUser.name,
-        image: existingUser.avatar
+        id: existingUserById.id,
+        email: existingUserById.email,
+        name: existingUserById.name,
+        image: existingUserById.avatar
       };
     }
 
+    // Ensuite, essayons de trouver l'utilisateur par email
+    const { data: existingUserByEmail, error: emailSearchError } = await supabase
+      .from('users')
+      .select('id, email, name, avatar')
+      .eq('email', profile.email)
+      .maybeSingle();
+
+    if (emailSearchError) {
+      console.error('Erreur lors de la recherche de l\'utilisateur par email:', emailSearchError);
+    }
+
+    // Si l'utilisateur existe par email, mettons à jour son ID pour correspondre à l'ID OAuth
+    if (existingUserByEmail) {
+      console.log('Utilisateur existant trouvé par email:', existingUserByEmail);
+      console.log('Mise à jour de l\'ID utilisateur pour correspondre à l\'ID OAuth:', userId);
+      
+      const { data: updatedUser, error: updateError } = await supabase
+        .from('users')
+        .update({
+          id: userId,
+          name: userName || existingUserByEmail.name,
+          avatar: userImage || existingUserByEmail.avatar
+        })
+        .eq('id', existingUserByEmail.id)
+        .select('id, email, name, avatar')
+        .single();
+        
+      if (updateError) {
+        console.error('Erreur lors de la mise à jour de l\'ID utilisateur:', updateError);
+        
+        // Si l'erreur est liée à une contrainte de clé unique, cela signifie probablement
+        // qu'un autre utilisateur avec cet ID existe déjà.
+        // Dans ce cas, utilisons l'ID existant au lieu d'essayer de le mettre à jour
+        if (updateError.code === '23505') {
+          console.log('Un autre utilisateur existe avec cet ID OAuth, utilisation de l\'utilisateur existant');
+          return {
+            id: existingUserByEmail.id,
+            email: existingUserByEmail.email,
+            name: existingUserByEmail.name,
+            image: existingUserByEmail.avatar
+          };
+        }
+        
+        throw updateError;
+      }
+      
+      console.log('ID utilisateur mis à jour avec l\'ID OAuth:', updatedUser);
+      return {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        image: updatedUser.avatar
+      };
+    }
+
+    // Si l'utilisateur n'existe pas du tout, créons-le
     console.log('Création d\'un nouvel utilisateur OAuth avec les données:', {
+      id: userId,
       email: profile.email,
       name: userName,
       avatar: userImage,
       provider
     });
 
-    // Sinon, créer un nouvel utilisateur
     const { data: newUser, error: createError } = await supabase
       .from('users')
       .insert({
+        id: userId,
         email: profile.email,
         name: userName || `${provider} User`,
         avatar: userImage || null,
-        // Pas de mot de passe pour les utilisateurs OAuth
         password: null,
         is_active: true
       })

@@ -1,6 +1,15 @@
+-- Supprimer toutes les tables existantes avec leurs dépendances
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS projects CASCADE;
+DROP TABLE IF EXISTS ticket_statuses CASCADE;
+DROP TABLE IF EXISTS tickets CASCADE;
+DROP TABLE IF EXISTS sub_tickets CASCADE;
+DROP TABLE IF EXISTS project_members CASCADE;
+DROP TABLE IF EXISTS ticket_comments CASCADE;
+
 -- Création de la table users
 CREATE TABLE IF NOT EXISTS users (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   email VARCHAR(255) NOT NULL UNIQUE,
   name VARCHAR(255) NOT NULL,
   password VARCHAR(255),
@@ -19,13 +28,17 @@ CREATE TABLE IF NOT EXISTS projects (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT,
-  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  owner_id TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
   is_active BOOLEAN DEFAULT TRUE NOT NULL,
   color VARCHAR(20) DEFAULT '#3b82f6', -- Couleur par défaut (bleu)
   icon VARCHAR(50) DEFAULT 'clipboard' -- Icône par défaut
 );
+
+-- Ajout de la contrainte de clé étrangère avec le bon type
+ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_owner_id_fkey;
+ALTER TABLE projects ADD CONSTRAINT projects_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE;
 
 -- Index pour accélérer les recherches de projets par utilisateur
 CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_id);
@@ -53,8 +66,8 @@ CREATE TABLE IF NOT EXISTS tickets (
   description TEXT,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   status_id INTEGER NOT NULL REFERENCES ticket_statuses(id) ON DELETE RESTRICT,
-  assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  assigned_to TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
   due_date TIMESTAMP WITH TIME ZONE,
@@ -80,7 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_tickets_parent ON tickets(parent_ticket_id) WHERE
 CREATE TABLE IF NOT EXISTS project_members (
   id SERIAL PRIMARY KEY,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role VARCHAR(50) NOT NULL DEFAULT 'member', -- 'owner', 'admin', 'member', 'viewer'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
   UNIQUE(project_id, user_id)
@@ -95,7 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);
 CREATE TABLE IF NOT EXISTS ticket_comments (
   id SERIAL PRIMARY KEY,
   ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,

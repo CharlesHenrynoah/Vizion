@@ -664,6 +664,9 @@ video {
 .right-1 {
   right: 0.25rem;
 }
+.right-1\.5 {
+  right: 0.375rem;
+}
 .right-2 {
   right: 0.5rem;
 }
@@ -786,6 +789,9 @@ video {
 .ml-1 {
   margin-left: 0.25rem;
 }
+.ml-2 {
+  margin-left: 0.5rem;
+}
 .ml-64 {
   margin-left: 16rem;
 }
@@ -821,6 +827,12 @@ video {
 }
 .mt-auto {
   margin-top: auto;
+}
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 .block {
   display: block;
@@ -1327,6 +1339,9 @@ video {
 .rounded {
   border-radius: 0.25rem;
 }
+.rounded-\[0\.5rem\] {
+  border-radius: 0.5rem;
+}
 .rounded-\[2px\] {
   border-radius: 2px;
 }
@@ -1460,6 +1475,10 @@ video {
   --tw-bg-opacity: 1;
   background-color: rgb(96 165 250 / var(--tw-bg-opacity, 1));
 }
+.bg-blue-500 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1));
+}
 .bg-border {
   background-color: hsl(var(--border));
 }
@@ -1592,6 +1611,10 @@ video {
 .px-1 {
   padding-left: 0.25rem;
   padding-right: 0.25rem;
+}
+.px-1\.5 {
+  padding-left: 0.375rem;
+  padding-right: 0.375rem;
 }
 .px-2 {
   padding-left: 0.5rem;
@@ -1735,6 +1758,9 @@ video {
 }
 .text-\[0\.8rem\] {
   font-size: 0.8rem;
+}
+.text-\[10px\] {
+  font-size: 10px;
 }
 .text-lg {
   font-size: 1.125rem;
@@ -1930,6 +1956,9 @@ video {
 }
 .opacity-0 {
   opacity: 0;
+}
+.opacity-100 {
+  opacity: 1;
 }
 .opacity-50 {
   opacity: 0.5;
@@ -2346,6 +2375,11 @@ video {
 .hover\:bg-blue-50:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(239 246 255 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:bg-blue-600:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(37 99 235 / var(--tw-bg-opacity, 1));
 }
 
 .hover\:bg-destructive\/80:hover {
@@ -3487,6 +3521,10 @@ video {
     border-radius: var(--radius);
   }
 
+  .sm\:pr-12 {
+    padding-right: 3rem;
+  }
+
   .sm\:text-left {
     text-align: left;
   }
@@ -3508,6 +3546,10 @@ video {
 
   .md\:flex {
     display: flex;
+  }
+
+  .md\:w-40 {
+    width: 10rem;
   }
 
   .md\:w-\[var\(--radix-navigation-menu-viewport-width\)\] {
@@ -3571,6 +3613,18 @@ video {
 }
 
 @media (min-width: 1024px) {
+
+  .lg\:inline-flex {
+    display: inline-flex;
+  }
+
+  .lg\:hidden {
+    display: none;
+  }
+
+  .lg\:w-64 {
+    width: 16rem;
+  }
 
   .lg\:grid-cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { tickets, ticketStatuses } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { supabaseAdmin } from '@/lib/db';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/auth-options';
+import { authOptions } from '../../../lib/auth/auth-options';
 
 // GET /api/tickets - Récupérer tous les tickets d'un projet
 export async function GET(request: NextRequest) {
@@ -21,30 +19,57 @@ export async function GET(request: NextRequest) {
     }
 
     // Récupérer les tickets du projet
-    const projectTickets = await db.select().from(tickets)
-      .where(eq(tickets.projectId, parseInt(projectId)));
+    const { data: projectTickets, error: ticketsError } = await supabaseAdmin
+      .from('tickets')
+      .select('*')
+      .eq('project_id', projectId);
+
+    if (ticketsError) {
+      console.error('Erreur lors de la récupération des tickets:', ticketsError);
+      return NextResponse.json({ error: 'Erreur lors de la récupération des tickets' }, { status: 500 });
+    }
 
     // Récupérer les statuts de tickets pour organiser les colonnes
-    const statuses = await db.select().from(ticketStatuses).orderBy(ticketStatuses.position);
+    const { data: statuses, error: statusesError } = await supabaseAdmin
+      .from('ticket_statuses')
+      .select('*')
+      .order('position');
+
+    if (statusesError) {
+      console.error('Erreur lors de la récupération des statuts:', statusesError);
+      return NextResponse.json({ error: 'Erreur lors de la récupération des statuts' }, { status: 500 });
+    }
 
     // Organiser les tickets par statut
     const ticketsByStatus = statuses.map(status => ({
       id: `column-${status.id}`,
       title: status.name,
       tickets: projectTickets
-        .filter(ticket => ticket.statusId === status.id && !ticket.isSubTicket)
+        .filter(ticket => ticket.status_id === status.id && !ticket.is_sub_ticket)
         .map(ticket => {
           // Trouver les sous-tickets pour ce ticket
           const subTickets = projectTickets.filter(t => 
-            t.isSubTicket && t.parentTicketId === ticket.id
+            t.is_sub_ticket && t.parent_ticket_id === ticket.id
           );
           
           return {
             ...ticket,
             id: ticket.id.toString(),
+            statusId: ticket.status_id,
+            projectId: ticket.project_id,
+            assignedTo: ticket.assigned_to,
+            createdBy: ticket.created_by,
+            isSubTicket: ticket.is_sub_ticket,
+            parentTicketId: ticket.parent_ticket_id,
             subTickets: subTickets.map(st => ({
               ...st,
               id: st.id.toString(),
+              statusId: st.status_id,
+              projectId: st.project_id,
+              assignedTo: st.assigned_to,
+              createdBy: st.created_by,
+              isSubTicket: st.is_sub_ticket,
+              parentTicketId: st.parent_ticket_id,
             }))
           };
         })
@@ -73,17 +98,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Créer le ticket
-    const newTicket = await db.insert(tickets).values({
-      title,
-      description,
-      projectId: parseInt(projectId),
-      statusId: parseInt(statusId),
-      createdBy: parseInt(session.user.id),
-      isSubTicket: isSubTicket || false,
-      parentTicketId: parentTicketId ? parseInt(parentTicketId) : null,
-    }).returning();
+    const { data: newTicket, error } = await supabaseAdmin
+      .from('tickets')
+      .insert({
+        title,
+        description,
+        project_id: projectId,
+        status_id: statusId,
+        created_by: session.user.id,
+        is_sub_ticket: isSubTicket || false,
+        parent_ticket_id: parentTicketId || null,
+      })
+      .select()
+      .single();
 
-    return NextResponse.json(newTicket[0]);
+    if (error) {
+      console.error('Erreur lors de la création du ticket:', error);
+      return NextResponse.json({ error: 'Erreur lors de la création du ticket' }, { status: 500 });
+    }
+
+    return NextResponse.json(newTicket);
   } catch (error) {
     console.error('Erreur lors de la création du ticket:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
@@ -105,24 +139,26 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'ID de ticket requis' }, { status: 400 });
     }
 
-    // Préparer les données à mettre à jour
-    const updateData: any = {};
-    if (title !== undefined) updateData.title = title;
-    if (description !== undefined) updateData.description = description;
-    if (statusId !== undefined) updateData.statusId = parseInt(statusId);
-    if (position !== undefined) updateData.position = position;
-
     // Mettre à jour le ticket
-    const updatedTicket = await db.update(tickets)
-      .set(updateData)
-      .where(eq(tickets.id, parseInt(id)))
-      .returning();
+    const { data: updatedTicket, error } = await supabaseAdmin
+      .from('tickets')
+      .update({
+        title,
+        description,
+        status_id: statusId,
+        position,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
 
-    if (updatedTicket.length === 0) {
-      return NextResponse.json({ error: 'Ticket non trouvé' }, { status: 404 });
+    if (error) {
+      console.error('Erreur lors de la mise à jour du ticket:', error);
+      return NextResponse.json({ error: 'Erreur lors de la mise à jour du ticket' }, { status: 500 });
     }
 
-    return NextResponse.json(updatedTicket[0]);
+    return NextResponse.json(updatedTicket);
   } catch (error) {
     console.error('Erreur lors de la mise à jour du ticket:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
@@ -138,22 +174,43 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    const ticketId = searchParams.get('id');
 
-    if (!id) {
+    if (!ticketId) {
       return NextResponse.json({ error: 'ID de ticket requis' }, { status: 400 });
     }
 
-    // Supprimer le ticket
-    const deletedTicket = await db.delete(tickets)
-      .where(eq(tickets.id, parseInt(id)))
-      .returning();
+    // Vérifier si le ticket a des sous-tickets
+    const { data: subTickets } = await supabaseAdmin
+      .from('tickets')
+      .select('id')
+      .eq('parent_ticket_id', ticketId);
 
-    if (deletedTicket.length === 0) {
-      return NextResponse.json({ error: 'Ticket non trouvé' }, { status: 404 });
+    if (subTickets && subTickets.length > 0) {
+      // Supprimer d'abord les sous-tickets
+      const { error: subTicketsError } = await supabaseAdmin
+        .from('tickets')
+        .delete()
+        .eq('parent_ticket_id', ticketId);
+
+      if (subTicketsError) {
+        console.error('Erreur lors de la suppression des sous-tickets:', subTicketsError);
+        return NextResponse.json({ error: 'Erreur lors de la suppression des sous-tickets' }, { status: 500 });
+      }
     }
 
-    return NextResponse.json({ success: true, message: 'Ticket supprimé avec succès' });
+    // Supprimer le ticket
+    const { error } = await supabaseAdmin
+      .from('tickets')
+      .delete()
+      .eq('id', ticketId);
+
+    if (error) {
+      console.error('Erreur lors de la suppression du ticket:', error);
+      return NextResponse.json({ error: 'Erreur lors de la suppression du ticket' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Erreur lors de la suppression du ticket:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

@@ -31,11 +31,13 @@ import {
   ChevronRight,
   ListPlus,
   Loader2,
+  Search,
 } from "lucide-react"
 import { Ticket, SubTicket } from "@/app/kanban/page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import { TicketSearch } from "@/components/ticket-search"
 
 // Types for our columns
 type ColumnType = {
@@ -433,12 +435,20 @@ export default function KanbanBoard({
   }
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{projectName}</h1>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Ajouter un ticket
-        </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">{projectName}</h1>
+          <p className="text-sm text-muted-foreground">Gérez votre projet avec ce tableau Kanban</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Ajout du composant de recherche */}
+          <TicketSearch projectId={projectId} />
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Ajouter un ticket
+          </Button>
+        </div>
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
@@ -534,7 +544,7 @@ export default function KanbanBoard({
                                           {...provided.droppableProps}
                                           className="space-y-2"
                                         >
-                                          {ticket.subTickets.map((subTicket, subIndex) => (
+                                          {ticket.subTickets && ticket.subTickets.map((subTicket, subIndex) => (
                                             <Draggable
                                               key={subTicket.id}
                                               draggableId={subTicket.id}

@@ -74,41 +74,53 @@ export default function KanbanPage() {
       setIsCheckingProjects(true)
 
       try {
-        // Envelopper l'appel API dans un bloc try-catch supplémentaire
-        try {
-          // Appeler l'API pour vérifier les projets de l'utilisateur
-          const response = await fetch('/api/projects/user')
-          
-          if (!response.ok) {
-            // En cas d'erreur de l'API, on suppose que l'utilisateur n'a pas de projets
-            // et on affiche le formulaire de création
-            // Éviter d'utiliser console.error qui peut causer des problèmes dans Next.js
-            setHasProjects(false)
-            setShowProjectCreation(true)
+        // Si nous n'avons pas d'ID de projet, vérifier si l'utilisateur a des projets
+        if (!projectId) {
+          try {
+            // Appeler l'API pour vérifier les projets de l'utilisateur
+            const response = await fetch('/api/projects/user')
+            
+            if (!response.ok) {
+              // En cas d'erreur de l'API, rediriger vers la page de création
+              console.log("Erreur API projects/user: redirection vers /create")
+              setIsCheckingProjects(false)
+              redirect('/create')
+              return
+            }
+            
+            const data = await response.json()
+            const userHasProjects = data.count > 0
+            
+            // Si l'utilisateur n'a pas de projets, rediriger vers la page de création
+            if (!userHasProjects) {
+              console.log("Utilisateur sans projets: redirection vers /create")
+              setIsCheckingProjects(false)
+              redirect('/create')
+              return
+            }
+            
+            // Si l'utilisateur a des projets mais qu'aucun n'est sélectionné,
+            // afficher le message d'erreur "ID de projet manquant"
+            setHasProjects(true)
+            setShowProjectCreation(false)
+            setError("ID de projet manquant")
+          } catch (fetchError) {
+            // En cas d'erreur, rediriger vers la page de création
+            console.log("Erreur lors de la vérification des projets:", fetchError)
+            setIsCheckingProjects(false)
+            redirect('/create')
             return
           }
-          
-          const data = await response.json()
-          const userHasProjects = data.count > 0
-          
-          setHasProjects(userHasProjects)
-          
-          // Si l'utilisateur n'a pas de projets et qu'il n'y a pas de paramètres d'URL,
-          // afficher le formulaire de création de projet
-          if (!userHasProjects && !projectId && (!projectName || projectName === "Untitled Project")) {
-            setShowProjectCreation(true)
-          } else {
-            setShowProjectCreation(false)
-          }
-        } catch (fetchError) {
-          // Gestion spécifique des erreurs de fetch
-          setHasProjects(false)
-          setShowProjectCreation(true)
+        } else {
+          // Si nous avons un ID de projet, on peut continuer normalement
+          setHasProjects(true)
+          setShowProjectCreation(false)
         }
       } catch (outerError) {
-        // Gestion globale des erreurs pour capturer tout ce qui pourrait être levé
+        // Gestion globale des erreurs
+        console.log("Erreur globale:", outerError)
         setHasProjects(false)
-        setShowProjectCreation(true)
+        setError("Une erreur est survenue")
       } finally {
         setIsCheckingProjects(false)
       }
@@ -282,11 +294,14 @@ export default function KanbanPage() {
   if (showProjectCreation) {
     return (
       <div className="container mx-auto py-6">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold text-blue-500 mb-6">Bienvenue sur Vizion</h1>
-          <div className="bg-white/60 border border-blue-400/50 rounded-lg overflow-hidden relative shadow-xl">
-            <ProjectCreationModal standalone={true} />
-          </div>
+        <div className="flex flex-col items-center justify-center gap-4">
+          <p className="text-lg text-center">Vous n'avez pas encore de projet.</p>
+          <button 
+            onClick={() => redirect('/create')}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+          >
+            Créer un nouveau projet
+          </button>
         </div>
       </div>
     )

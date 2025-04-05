@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Sparkles } from "lucide-react"
-import { enhanceProjectDescription } from "@/app/actions/gemini-integration"
+import { enhanceProjectDescription, generateProjectTickets, createProjectTicketsInDB, generateProjectTicketsFormatted } from "@/app/actions/gemini-integration"
 import { useSession } from "next-auth/react"
 import { toast } from "@/components/ui/use-toast"
 
@@ -98,13 +98,15 @@ export function ProjectFormEnhanced({ onProjectCreated }: ProjectFormEnhancedPro
     if (!session?.user?.id) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: "Vous devez être connecté pour créer un projet.",
+        title: "Error",
+        description: "You must be logged in to create a project.",
       })
       return false
     }
 
     try {
+      console.log("Creating project with session user ID:", session.user.id);
+      
       const response = await fetch('/api/projects', {
         method: 'POST',
         headers: {
@@ -113,23 +115,26 @@ export function ProjectFormEnhanced({ onProjectCreated }: ProjectFormEnhancedPro
         body: JSON.stringify({
           name,
           description,
-          color: '#3B82F6', // Couleur bleue par défaut
-          icon: 'sparkles', // Icône par défaut
+          color: '#3B82F6', // Default blue color
+          icon: 'sparkles', // Default icon
         }),
       })
 
       if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${await response.text()}`)
+        const errorData = await response.json();
+        console.error(`Error ${response.status}:`, errorData);
+        throw new Error(`Error ${response.status}: ${JSON.stringify(errorData)}`);
       }
 
       const data = await response.json()
+      console.log("Project created successfully:", data);
       return data
     } catch (error) {
-      console.error("Erreur lors de la création du projet:", error)
+      console.error("Error creating project:", error)
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de créer le projet. Veuillez réessayer.",
+        title: "Error",
+        description: "Unable to create project. Please try again.",
       })
       return false
     }
@@ -147,12 +152,12 @@ export function ProjectFormEnhanced({ onProjectCreated }: ProjectFormEnhancedPro
       )
 
       if (projectData) {
-        // Ajouter le projet au localStorage pour la compatibilité avec le code existant
+        // Add project to localStorage for compatibility with existing code
         try {
           const storedProjects = localStorage.getItem("skwerd-projects")
           let projectsList = storedProjects ? JSON.parse(storedProjects) : []
           
-          // Vérifier si le projet existe déjà
+          // Check if the project already exists
           if (!projectsList.some((p: any) => p.name === projectName)) {
             const newProject = {
               id: `project-${projectData.id || Date.now()}`,
@@ -165,20 +170,67 @@ export function ProjectFormEnhanced({ onProjectCreated }: ProjectFormEnhancedPro
             localStorage.setItem("skwerd-projects", JSON.stringify(projectsList))
           }
         } catch (error) {
-          console.error("Erreur lors de l'ajout du projet au localStorage:", error)
+          console.error("Error adding project to localStorage:", error)
         }
 
-        // Appeler le callback si fourni
+        // Générer les tickets pour le projet avec Gemini
+        try {
+          toast({
+            title: "Génération des tickets en cours...",
+            description: "Votre tableau Kanban se prépare avec des tickets personnalisés",
+          })
+          
+          // Extraire l'ID de l'utilisateur actuel de la session
+          const userId = session?.user?.id || session?.user?.email || 'unknown';
+          
+          // Utiliser le format standard (format JSON)
+          const generatedTickets = await generateProjectTickets(
+            projectName || "Untitled Project",
+            projectGoal
+          )
+          
+          if (generatedTickets && generatedTickets.length > 0) {
+            // Créer les tickets dans la base de données
+            const ticketsCreated = await createProjectTicketsInDB(
+              projectData.id,
+              generatedTickets,
+              userId
+            )
+            
+            if (ticketsCreated) {
+              toast({
+                title: "Tickets générés avec succès",
+                description: `${generatedTickets.length} tickets ont été créés pour votre projet`,
+              })
+            } else {
+              toast({
+                variant: "destructive",
+                title: "Erreur",
+                description: "Impossible de créer les tickets. Veuillez réessayer.",
+              })
+            }
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Attention",
+              description: "Aucun ticket n'a pu être généré automatiquement.",
+            })
+          }
+        } catch (ticketError) {
+          console.error("Erreur lors de la génération des tickets:", ticketError)
+        }
+
+        // Call the callback if provided
         if (onProjectCreated) {
           onProjectCreated()
         }
 
-        // Construire l'URL avec les paramètres du projet
+        // Build URL with project parameters
         const params = new URLSearchParams()
         params.append("projectId", projectData.id)
         params.append("name", projectName || "Untitled Project")
         
-        // Rediriger vers la page Kanban avec les paramètres
+        // Redirect to Kanban page with parameters
         router.push(`/kanban?${params.toString()}`)
       } else {
         setIsLoading(false)
@@ -296,7 +348,7 @@ export function ProjectFormEnhanced({ onProjectCreated }: ProjectFormEnhancedPro
                   Processing...
                 </>
               ) : (
-                "Generate Project Structure"
+                "Create Project"
               )}
             </Button>
             {(!projectName.trim() || !projectGoal.trim()) && (
