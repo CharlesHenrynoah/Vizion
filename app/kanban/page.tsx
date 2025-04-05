@@ -50,12 +50,13 @@ export default function KanbanPage() {
   const searchParams = useSearchParams()
   const projectId = searchParams?.get("projectId")
   const projectName = searchParams?.get("name") || "Untitled Project"
-  const { data: session, status } = useSession({
-    required: true,
-    onUnauthenticated() {
+  const { data: session, status } = useSession()
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
       redirect('/login?callbackUrl=/kanban' + (projectId ? `?projectId=${projectId}` : ''))
-    },
-  })
+    }
+  }, [status, projectId])
 
   const [isLoading, setIsLoading] = useState(true)
   const [columns, setColumns] = useState<ColumnType[]>([])
