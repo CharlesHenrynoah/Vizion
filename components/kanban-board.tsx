@@ -2,7 +2,7 @@
 
 import { DialogTrigger } from "@/components/ui/dialog"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,18 +20,30 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import {
-  Plus,
-  Edit,
-  Trash2,
-  Copy,
-  MoreHorizontal,
-  MessageSquare,
-  RefreshCw,
+  AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  Check,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
+  Clock,
+  Copy,
+  Edit,
+  Flag,
   ListPlus,
   Loader2,
+  MessageSquare,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
   Search,
+  Sparkles,
+  Ticket as TicketIcon,
+  Trash,
+  Trash2,
+  X,
 } from "lucide-react"
 import { Ticket, SubTicket } from "@/app/kanban/page"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -111,6 +123,31 @@ export default function KanbanBoard({
   // Ajouter après les autres états
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  
+  // États pour la génération de sous-tickets avec IA
+  const [isAISubTicketDialogOpen, setIsAISubTicketDialogOpen] = useState(false)
+  const [aiSubTicketDescription, setAISubTicketDescription] = useState("")
+  const [selectedEpicForAI, setSelectedEpicForAI] = useState<Ticket | null>(null)
+  const [isGeneratingWithAI, setIsGeneratingWithAI] = useState(false)
+  const [generatedSubTicket, setGeneratedSubTicket] = useState<{ title: string; description: string } | null>(null)
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
+
+  // États pour l'édition du sous-ticket en prévisualisation
+  const [editableTitle, setEditableTitle] = useState("")
+  const [editableDescription, setEditableDescription] = useState("")
+  const [isEditing, setIsEditing] = useState(false)
+
+  const MAX_DESCRIPTION_LENGTH = 800
+
+  useEffect(() => {
+    if (generatedSubTicket) {
+      setEditableTitle(generatedSubTicket.title)
+      // S'assurer que la description ne dépasse jamais MAX_DESCRIPTION_LENGTH
+      const safeDescription = generatedSubTicket.description || ""
+      setEditableDescription(safeDescription.substring(0, MAX_DESCRIPTION_LENGTH))
+      setIsEditing(false)
+    }
+  }, [generatedSubTicket])
 
   // Toggle expanded state for a ticket
   const toggleTicketExpanded = (ticketId: string) => {
@@ -197,13 +234,12 @@ export default function KanbanBoard({
       let ticketIndex = -1
 
       // Find the parent ticket
-      for (let i = 0; i < newColumns.length; i++) {
-        const column = newColumns[i]
+      for (const column of newColumns) {
         const tIndex = column.tickets.findIndex((t) => t.id === parentTicketId)
 
         if (tIndex !== -1) {
           parentTicket = column.tickets[tIndex]
-          columnIndex = i
+          columnIndex = newColumns.indexOf(column)
           ticketIndex = tIndex
           break
         }
@@ -434,6 +470,419 @@ export default function KanbanBoard({
     }
   }
 
+  // Fonction pour générer un sous-ticket avec IA (prévisualisation)
+  const handlePreviewSubTicket = async () => {
+    if (!selectedEpicForAI || !selectedEpicForAI.id) {
+      return
+    }
+    
+    setIsGeneratingWithAI(true)
+    try {
+      // Appel à l'API pour obtenir une prévisualisation du sous-ticket généré par l'IA
+      console.log("Génération d'une prévisualisation avec les données:", {
+        epicId: selectedEpicForAI.id,
+        epicTitle: selectedEpicForAI.title,
+        descriptionLength: aiSubTicketDescription.length
+      });
+      
+      const response = await fetch('/api/tickets/ai-subticket/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          epicId: selectedEpicForAI.id,
+          epicTitle: selectedEpicForAI.title,
+          epicDescription: selectedEpicForAI.description || "",
+          subTicketDescription: aiSubTicketDescription,
+        }),
+      })
+
+      console.log("Statut de la réponse de génération:", response.status);
+      
+      if (!response.ok) {
+        let errorMessage = 'Erreur lors de la génération du sous-ticket'
+        
+        try {
+          // Lire la réponse texte d'abord
+          const responseText = await response.text();
+          console.log("Texte de la réponse d'erreur:", responseText || "");
+          
+          if (responseText && responseText.trim() !== "") {
+            try {
+              const errorData = JSON.parse(responseText);
+              console.error("Détails de l'erreur:", errorData || {});
+              if (errorData && errorData.error) {
+                errorMessage = errorData.error;
+              }
+            } catch (parseError) {
+              console.error("Erreur lors du parsing de la réponse d'erreur JSON:", parseError);
+            }
+          }
+        } catch (e) {
+          console.error("Erreur lors de la lecture de la réponse d'erreur:", e);
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Lire la réponse de manière sécurisée
+      let generatedData;
+      try {
+        const responseText = await response.text();
+        console.log("Texte de la réponse de génération:", responseText.substring(0, 100) + "...");
+        
+        if (responseText && responseText.trim() !== "") {
+          try {
+            generatedData = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error("Erreur lors du parsing de la réponse JSON:", parseError);
+            // Créer un objet par défaut
+            generatedData = {
+              title: `Ticket pour: ${aiSubTicketDescription.substring(0, 50)}...`,
+              description: aiSubTicketDescription.substring(0, 400),
+              priority: 2
+            };
+          }
+        } else {
+          console.warn("Réponse vide reçue de l'API de génération");
+          generatedData = {
+            title: `Ticket pour: ${aiSubTicketDescription.substring(0, 50)}...`,
+            description: aiSubTicketDescription.substring(0, 400),
+            priority: 2
+          };
+        }
+      } catch (error) {
+        console.error("Erreur lors de la lecture de la réponse:", error);
+        // Créer un objet par défaut en cas d'erreur
+        generatedData = {
+          title: `Ticket pour: ${aiSubTicketDescription.substring(0, 50)}...`,
+          description: aiSubTicketDescription.substring(0, 400),
+          priority: 2
+        };
+      }
+      
+      console.log("Prévisualisation générée avec succès:", {
+        title: generatedData.title,
+        descriptionLength: generatedData.description?.length || 0
+      });
+      
+      // S'assurer que les champs requis sont présents
+      if (!generatedData.title) {
+        generatedData.title = `Ticket pour: ${aiSubTicketDescription.substring(0, 50)}...`;
+      }
+      
+      if (!generatedData.description) {
+        generatedData.description = aiSubTicketDescription.substring(0, 400);
+      }
+      
+      // Limiter la description au maximum autorisé
+      if (generatedData.description && generatedData.description.length > MAX_DESCRIPTION_LENGTH) {
+        generatedData.description = generatedData.description.substring(0, MAX_DESCRIPTION_LENGTH);
+      }
+      
+      setGeneratedSubTicket(generatedData);
+      setEditableTitle(generatedData.title);
+      setEditableDescription(generatedData.description);
+      setIsPreviewMode(true);
+      
+    } catch (error) {
+      console.error("Erreur lors de la génération du sous-ticket:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de la génération du sous-ticket avec l'IA.",
+      });
+    } finally {
+      setIsGeneratingWithAI(false);
+    }
+  };
+
+  // Fonction séparée pour créer un sous-ticket à partir de la prévisualisation
+  const handleValidateSubTicket = async () => {
+    if (!selectedEpicForAI || !selectedEpicForAI.id || !generatedSubTicket) {
+      console.error("Informations manquantes pour valider le sous-ticket");
+      return;
+    }
+
+    setIsGeneratingWithAI(true);
+    try {
+      // Utiliser le titre et la description édités par l'utilisateur
+      const finalSubTicket = {
+        ...generatedSubTicket,
+        title: editableTitle,
+        description: editableDescription
+      };
+
+      console.log("Validation du sous-ticket:", {
+        epicId: selectedEpicForAI.id,
+        epicTitle: selectedEpicForAI.title,
+        title: finalSubTicket.title,
+        descriptionLength: finalSubTicket.description.length
+      });
+
+      // Appel API pour créer le sous-ticket
+      const requestBody = {
+        epicId: selectedEpicForAI.id,
+        epicTitle: selectedEpicForAI.title,
+        epicDescription: selectedEpicForAI.description || "",
+        subTicketDescription: aiSubTicketDescription,
+        generatedSubTicket: finalSubTicket
+      };
+      
+      console.log("Envoi de la requête de création:", JSON.stringify(requestBody));
+      
+      const response = await fetch('/api/tickets/ai-subticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log("Statut de la réponse:", response.status);
+      
+      // Traiter la réponse de manière sécurisée
+      let responseBody;
+      try {
+        const responseText = await response.text();
+        console.log("Texte de la réponse:", responseText ? responseText.substring(0, 50) + "..." : "(vide)");
+        
+        responseBody = responseText && responseText.trim() !== "" 
+          ? JSON.parse(responseText) 
+          : { error: "Réponse vide du serveur" };
+          
+      } catch (error) {
+        console.error("Erreur lors du traitement de la réponse:", error);
+        responseBody = { error: "Impossible de traiter la réponse du serveur" };
+      }
+
+      if (!response.ok) {
+        const errorMsg = responseBody.error || `Erreur ${response.status} lors de la création du sous-ticket`;
+        throw new Error(errorMsg);
+      }
+
+      // Vérifier que nous avons un ID valide
+      if (!responseBody.id) {
+        throw new Error("Le sous-ticket créé n'a pas d'identifiant valide");
+      }
+
+      // Mettre à jour l'état local pour afficher le nouveau sous-ticket
+      const newColumns = [...columns];
+      for (const column of newColumns) {
+        for (const ticket of column.tickets) {
+          if (ticket.id === selectedEpicForAI.id) {
+            if (!ticket.subTickets) {
+              ticket.subTickets = [];
+            }
+            ticket.subTickets.push(responseBody);
+            break;
+          }
+        }
+      }
+      setColumns(newColumns);
+      
+      // Réinitialiser tous les états
+      setIsAISubTicketDialogOpen(false);
+      setAISubTicketDescription("");
+      setSelectedEpicForAI(null);
+      setGeneratedSubTicket(null);
+      setIsPreviewMode(false);
+      setIsEditing(false);
+      setEditableTitle("");
+      setEditableDescription("");
+      
+      toast({
+        title: "Succès",
+        description: "Sous-ticket créé avec succès !",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Erreur lors de la validation du sous-ticket:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de créer le sous-ticket. Veuillez réessayer.",
+      });
+    } finally {
+      setIsGeneratingWithAI(false);
+    }
+  };
+
+  // Nouvelle fonction pour régénérer directement un sous-ticket
+  const handleRegenerateSubTicket = async () => {
+    if (!selectedEpicForAI || !selectedEpicForAI.id || !aiSubTicketDescription.trim()) {
+      return;
+    }
+    
+    setIsGeneratingWithAI(true);
+    
+    try {
+      // Utiliser la même API mais sans passer de generatedSubTicket pour forcer une nouvelle génération
+      const epicId: string = selectedEpicForAI.id;
+      const epicTitle: string = selectedEpicForAI.title || '';
+      const epicDescription: string = selectedEpicForAI.description || '';
+      
+      const response = await fetch('/api/tickets/ai-subticket/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          epicId: epicId,
+          epicTitle: epicTitle,
+          epicDescription: epicDescription,
+          subTicketDescription: aiSubTicketDescription,
+        }),
+      });
+
+      console.log("Statut de la réponse de génération:", response.status);
+      
+      if (!response.ok) {
+        let errorMessage = 'Erreur lors de la génération du sous-ticket'
+        
+        try {
+          // Lire la réponse texte d'abord
+          const responseText = await response.text();
+          console.log("Texte de la réponse d'erreur:", responseText || "");
+          
+          if (responseText && responseText.trim() !== "") {
+            try {
+              const errorData = JSON.parse(responseText);
+              console.error("Détails de l'erreur:", errorData || {});
+              if (errorData && errorData.error) {
+                errorMessage = errorData.error;
+              }
+            } catch (parseError) {
+              console.error("Erreur lors du parsing de la réponse d'erreur JSON:", parseError);
+            }
+          }
+        } catch (e) {
+          console.error("Erreur lors de la lecture de la réponse d'erreur:", e);
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Lire la réponse de manière sécurisée
+      let generatedData;
+      try {
+        const responseText = await response.text();
+        console.log("Texte de la réponse de génération:", responseText.substring(0, 100) + "...");
+        
+        if (responseText && responseText.trim() !== "") {
+          try {
+            generatedData = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error("Erreur lors du parsing de la réponse JSON:", parseError);
+            // Créer un objet par défaut
+            generatedData = {
+              title: `Ticket pour: ${aiSubTicketDescription.substring(0, 50)}...`,
+              description: aiSubTicketDescription.substring(0, 400),
+              priority: 2
+            };
+          }
+        } else {
+          console.warn("Réponse vide reçue de l'API de génération");
+          generatedData = {
+            title: `Ticket pour: ${aiSubTicketDescription.substring(0, 50)}...`,
+            description: aiSubTicketDescription.substring(0, 400),
+            priority: 2
+          };
+        }
+      } catch (error) {
+        console.error("Erreur lors de la lecture de la réponse:", error);
+        // Créer un objet par défaut en cas d'erreur
+        generatedData = {
+          title: `Ticket pour: ${aiSubTicketDescription.substring(0, 50)}...`,
+          description: aiSubTicketDescription.substring(0, 400),
+          priority: 2
+        };
+      }
+      
+      console.log("Prévisualisation générée avec succès:", {
+        title: generatedData.title,
+        descriptionLength: generatedData.description?.length || 0
+      });
+      
+      // S'assurer que les champs requis sont présents
+      if (!generatedData.title) {
+        generatedData.title = `Ticket pour: ${aiSubTicketDescription.substring(0, 50)}...`;
+      }
+      
+      if (!generatedData.description) {
+        generatedData.description = aiSubTicketDescription.substring(0, 400);
+      }
+      
+      // Limiter la description au maximum autorisé
+      if (generatedData.description && generatedData.description.length > MAX_DESCRIPTION_LENGTH) {
+        generatedData.description = generatedData.description.substring(0, MAX_DESCRIPTION_LENGTH);
+      }
+      
+      setGeneratedSubTicket(generatedData);
+      
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de la génération du sous-ticket avec l'IA.",
+      });
+    } finally {
+      setIsGeneratingWithAI(false);
+    }
+  };
+
+  // Fonction pour gérer la validation du formulaire d'édition
+  const handleEditFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Limiter la description à MAX_DESCRIPTION_LENGTH caractères
+    const trimmedDescription = editableDescription.slice(0, MAX_DESCRIPTION_LENGTH)
+    
+    setGeneratedSubTicket({
+      ...generatedSubTicket,
+      title: editableTitle,
+      description: trimmedDescription
+    })
+    
+    setIsEditing(false)
+  }
+
+  // Gérer les modifications du titre éditable
+  const handleEditableTitle = (title: string) => {
+    try {
+      console.log("Mise à jour du titre éditable:", title);
+      setEditableTitle(title || "");
+      
+      if (generatedSubTicket) {
+        const updatedSubTicket = { ...generatedSubTicket, title: title || "" };
+        setGeneratedSubTicket(updatedSubTicket);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du titre éditable:", error);
+      // Ne pas propager l'erreur, simplement logger
+    }
+  }
+  
+  // Gérer les modifications de la description éditable
+  const handleEditableDescription = (description: string) => {
+    try {
+      console.log("Mise à jour de la description éditable, longueur:", description?.length || 0);
+      setEditableDescription(description || "");
+      
+      if (generatedSubTicket) {
+        // Limiter la description à la longueur maximale
+        const trimmedDescription = description && description.length > MAX_DESCRIPTION_LENGTH
+          ? description.substring(0, MAX_DESCRIPTION_LENGTH)
+          : description || "";
+        
+        const updatedSubTicket = { ...generatedSubTicket, description: trimmedDescription };
+        setGeneratedSubTicket(updatedSubTicket);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de la description éditable:", error);
+      // Ne pas propager l'erreur, simplement logger
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -520,6 +969,15 @@ export default function KanbanBoard({
                                         <ListPlus className="mr-2 h-4 w-4" />
                                         Ajouter un sous-ticket
                                       </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setSelectedEpicForAI(ticket)
+                                          setIsAISubTicketDialogOpen(true)
+                                        }}
+                                      >
+                                        <Sparkles className="mr-2 h-4 w-4" />
+                                        Générer sous-ticket avec IA
+                                      </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => handleDeleteTicket(ticket.id)}>
                                         <Trash2 className="mr-2 h-4 w-4" />
                                         Supprimer
@@ -599,6 +1057,26 @@ export default function KanbanBoard({
                                         </div>
                                       )}
                                     </Droppable>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="w-full mt-2 text-xs flex items-center justify-center"
+                                      onClick={() => {
+                                        // Réinitialiser tous les états avant d'ouvrir pour un nouveau ticket
+                                        setAISubTicketDescription("")
+                                        setGeneratedSubTicket(null)
+                                        setIsPreviewMode(false)
+                                        setIsEditing(false)
+                                        setEditableTitle("")
+                                        setEditableDescription("")
+                                        // Puis définir le nouvel EPIC sélectionné et ouvrir le dialogue
+                                        setSelectedEpicForAI(ticket)
+                                        setIsAISubTicketDialogOpen(true)
+                                      }}
+                                    >
+                                      <Sparkles className="mr-2 h-3 w-3" />
+                                      Générer sous-ticket avec IA
+                                    </Button>
                                   </div>
                                 </CardFooter>
                               )}
@@ -795,6 +1273,228 @@ export default function KanbanBoard({
               Enregistrer
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal pour créer un sous-ticket avec IA */}
+      <Dialog
+        open={isAISubTicketDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Réinitialiser complètement tous les états lors de la fermeture
+            setIsAISubTicketDialogOpen(false)
+            setAISubTicketDescription("")
+            setSelectedEpicForAI(null)
+            setGeneratedSubTicket(null)
+            setIsPreviewMode(false)
+            setIsEditing(false)
+            setEditableTitle("")
+            setEditableDescription("")
+            setIsGeneratingWithAI(false)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[900px] sm:min-w-[800px] max-h-[650px] overflow-hidden">
+          <DialogHeader className="pb-1">
+            <DialogTitle className="text-blue-500 text-xl flex items-center">
+              <Sparkles className="mr-2 h-5 w-5 text-blue-400" />
+              Générer un sous-ticket avec IA
+            </DialogTitle>
+            <DialogDescription className="text-blue-400 flex items-center">
+              Génération de sous-ticket pour 
+              {selectedEpicForAI ? (
+                <span className="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md font-semibold flex items-center">
+                  <TicketIcon className="h-3.5 w-3.5 mr-1" />
+                  {selectedEpicForAI.title}
+                </span>
+              ) : (
+                <span className="ml-1 text-gray-400 italic">(Aucun EPIC sélectionné)</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 h-[430px]">
+            <div className="space-y-2 h-full flex flex-col">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ai-subticket-description" className="text-blue-500">
+                  Description du sous-ticket souhaité
+                </Label>
+              </div>
+              <Textarea
+                id="ai-subticket-description"
+                placeholder="Ex: Créer un formulaire de contact avec validation des champs"
+                value={aiSubTicketDescription}
+                onChange={(e) => {
+                  // Limiter à 800 caractères
+                  if (e.target.value.length <= MAX_DESCRIPTION_LENGTH) {
+                    setAISubTicketDescription(e.target.value)
+                  }
+                }}
+                maxLength={MAX_DESCRIPTION_LENGTH}
+                className="flex-grow min-h-[300px] bg-white text-blue-400 placeholder:text-blue-300 border-blue-400/30"
+              />
+              <div className="text-xs text-muted-foreground mt-1 text-left">
+                {Math.min(aiSubTicketDescription.length, MAX_DESCRIPTION_LENGTH)}/{MAX_DESCRIPTION_LENGTH}
+              </div>
+              {/* Le bouton Générer a été supprimé ici pour éviter la duplication, car il existe déjà en bas de la modal */}
+            </div>
+            
+            <div className="h-full flex flex-col">
+              {isPreviewMode && generatedSubTicket ? (
+                <div className="h-full flex flex-col">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-blue-500 mr-2">{selectedEpicForAI?.title}</span>
+                    </div>
+                    <Button 
+                      onClick={() => setIsEditing(!isEditing)} 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs"
+                    >
+                      {isEditing ? "Annuler" : "Modifier"}
+                      {isEditing ? <X className="ml-2 h-3 w-3" /> : <Pencil className="ml-2 h-3 w-3" />}
+                    </Button>
+                  </div>
+                  
+                  <div className="flex-grow mb-2">
+                    {isEditing ? (
+                      // Formulaire d'édition
+                      <form onSubmit={handleEditFormSubmit} className="space-y-3 h-full flex flex-col">
+                        <div>
+                          <Label htmlFor="title" className="text-xs font-medium">Titre</Label>
+                          <Input 
+                            id="title"
+                            value={editableTitle}
+                            onChange={(e) => handleEditableTitle(e.target.value)}
+                            className="h-8 text-xs"
+                            maxLength={200}
+                          />
+                        </div>
+                        <div className="flex-grow flex flex-col">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="description" className="text-xs font-medium">Description</Label>
+                          </div>
+                          <Textarea 
+                            id="description"
+                            value={editableDescription}
+                            onChange={(e) => handleEditableDescription(e.target.value)}
+                            maxLength={MAX_DESCRIPTION_LENGTH}
+                            className="text-xs flex-grow"
+                            placeholder="Description du sous-ticket"
+                          />
+                          <div className="text-xs text-muted-foreground mt-1 text-left">
+                            {Math.min(editableDescription.length, MAX_DESCRIPTION_LENGTH)}/{MAX_DESCRIPTION_LENGTH}
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button type="submit" size="sm" className="text-xs bg-blue-500 hover:bg-blue-400">
+                            <Check className="mr-2 h-3 w-3" />
+                            Appliquer
+                          </Button>
+                        </div>
+                      </form>
+                    ) : (
+                      // Affichage de la prévisualisation
+                      <div className="bg-background border rounded p-4 text-xs h-full flex flex-col">
+                        <div className="mb-2 pb-2 border-b">
+                          <span className="font-medium text-sm">{generatedSubTicket.title}</span>
+                        </div>
+                        {generatedSubTicket.description && (
+                          <div className="text-muted-foreground whitespace-pre-line overflow-y-auto pr-1 flex-grow max-h-[250px] custom-scrollbar">
+                            {generatedSubTicket.description.substring(0, MAX_DESCRIPTION_LENGTH)}
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground text-left mt-2 pt-2 border-t">
+                          {Math.min(generatedSubTicket?.description?.length || 0, MAX_DESCRIPTION_LENGTH)}/{MAX_DESCRIPTION_LENGTH}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-center p-6 border rounded border-dashed">
+                  <div>
+                    <Sparkles className="w-10 h-10 mx-auto mb-4 text-blue-300" />
+                    <p>Zone de prévisualisation</p>
+                    <p className="text-xs mt-2">Décrivez le ticket et cliquez sur "Générer"</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-between pt-3 border-t mt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Réinitialiser complètement tous les états
+                setIsAISubTicketDialogOpen(false)
+                setAISubTicketDescription("")
+                setSelectedEpicForAI(null)
+                setGeneratedSubTicket(null)
+                setIsPreviewMode(false)
+                setIsEditing(false)
+                setEditableTitle("")
+                setEditableDescription("")
+                setIsGeneratingWithAI(false)
+              }}
+              className="border-blue-400/30 text-blue-500"
+            >
+              Annuler
+            </Button>
+            
+            {!isPreviewMode ? (
+              // Mode saisie - Bouton Générer
+              <Button
+                onClick={handlePreviewSubTicket}
+                disabled={!aiSubTicketDescription.trim() || isGeneratingWithAI}
+                className="bg-blue-500 hover:bg-blue-400 text-white"
+              >
+                {isGeneratingWithAI ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    En cours de génération...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Générer
+                  </>
+                )}
+              </Button>
+            ) : (
+              // Mode prévisualisation - Boutons Régénérer et Valider
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => {
+                    setGeneratedSubTicket(null);
+                    handleRegenerateSubTicket();
+                  }} 
+                  variant="outline"
+                  className="border-blue-400/30 text-blue-500"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Régénérer
+                </Button>
+                <Button 
+                  onClick={handleValidateSubTicket} 
+                  disabled={isGeneratingWithAI}
+                  className="bg-green-500 hover:bg-green-400 text-white"
+                >
+                  {isGeneratingWithAI ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      En cours de génération...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Valider ticket
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

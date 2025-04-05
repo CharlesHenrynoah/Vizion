@@ -116,7 +116,7 @@ export async function generateProjectTickets(
     - Inclure la méthode HTTP, l'URL, les données envoyées/reçues et comment l'interface réagit
 
     Spécificité React :
-    - Mentionner explicitement les noms des composants React et hooks à utiliser
+    - Mentionner explicitement les noms des composants React à utiliser
     
     Types de Tickets Restreints :
     - Utiliser uniquement les types suivants : (React), (API Intégration), (React UI), (React Routing), (React State/Context), (Frontend Best Practices), (Auth), (Subscription), (UX/UI)
@@ -198,7 +198,7 @@ export async function generateProjectTickets(
     const tickets = JSON.parse(cleanJson);
     
     // S'assurer que tous les tickets sont en statut "To Do"
-    return tickets.map((ticket: any) => {
+    let processedTickets = tickets.map((ticket: any) => {
       // Forcer le statut "To Do" pour tous les tickets
       ticket.status = "To Do";
       
@@ -224,8 +224,37 @@ export async function generateProjectTickets(
       
       return ticket;
     });
+    
+    // Réorganiser les tickets pour que les épics d'authentification et profil utilisateur soient toujours en dernier
+    const authAndProfileEpics: any[] = [];
+    const otherEpics: any[] = [];
+    
+    processedTickets.forEach((ticket: any) => {
+      // Vérifier si le ticket est lié à l'authentification ou au profil utilisateur
+      if (
+        ticket.title.toLowerCase().includes("auth") || 
+        ticket.title.toLowerCase().includes("authentification") ||
+        ticket.title.toLowerCase().includes("login") || 
+        ticket.title.toLowerCase().includes("connexion") ||
+        ticket.title.toLowerCase().includes("profil") ||
+        ticket.title.toLowerCase().includes("profile") ||
+        ticket.title.toLowerCase().includes("utilisateur") ||
+        ticket.title.toLowerCase().includes("user") ||
+        ticket.title.toLowerCase().includes("préférences") ||
+        ticket.title.toLowerCase().includes("preferences") ||
+        ticket.description.toLowerCase().includes("authentification") ||
+        ticket.description.toLowerCase().includes("profil utilisateur")
+      ) {
+        authAndProfileEpics.push(ticket);
+      } else {
+        otherEpics.push(ticket);
+      }
+    });
+    
+    // Combiner les deux listes avec les épics d'authentification et profil en dernier
+    return [...otherEpics, ...authAndProfileEpics];
   } catch (error) {
-    console.error("Erreur lors de la génération des tickets de projet:", error);
+    console.error("Erreur lors du parsing des tickets de projet:", error)
     return [];
   }
 }
@@ -355,120 +384,243 @@ export async function createProjectTicketsInDB(
       // Créer les statuts par défaut
       const defaultStatuses = [
         { name: 'To Do', color: '#4287f5', position: 0 },
-        { name: 'In Progress', color: '#f5a742', position: 1 },
-        { name: 'Done', color: '#42f569', position: 2 }
+        { name: 'In Progress', color: '#f5a142', position: 1 },
+        { name: 'Done', color: '#42f545', position: 2 },
       ];
       
       for (const status of defaultStatuses) {
         const { data, error } = await supabaseAdmin
           .from('ticket_statuses')
           .insert(status)
-          .select()
-          .single();
+          .select();
           
         if (error) {
-          console.error(`Erreur lors de la création du statut ${status.name}:`, error);
-        } else if (data) {
-          statusMap[data.name] = data.id;
+          console.error('Erreur lors de la création du statut:', error);
+          return false;
         }
-      }
-      
-      // Récupérer à nouveau les statuts après création
-      const { data: newStatuses } = await supabaseAdmin
-        .from('ticket_statuses')
-        .select('id, name');
         
-      if (newStatuses && newStatuses.length > 0) {
-        statusMap = newStatuses.reduce((acc: Record<string, string>, status: any) => {
-          acc[status.name] = status.id;
-          return acc;
-        }, {});
-      } else {
-        // Si toujours pas de statuts, on ne peut pas continuer
-        console.error('Impossible de créer ou récupérer les statuts de tickets');
-        return false;
+        if (data && data[0]) {
+          statusMap[status.name] = data[0].id;
+        }
       }
     } else {
-      // Utiliser les statuts existants
-      statusMap = statuses.reduce((acc: Record<string, string>, status: any) => {
-        acc[status.name] = status.id;
-        return acc;
-      }, {});
+      // Créer une map des status pour les retrouver facilement
+      for (const status of statuses) {
+        statusMap[status.name] = status.id;
+      }
     }
     
-    console.log('Statuts disponibles:', Object.keys(statusMap));
-
-    // Fonction pour créer un ticket dans la base de données
-    const createTicket = async (
-      ticket: any,
-      parentId: string | null = null,
-      position: number
-    ) => {
-      // Déterminer le statut ID à partir du nom
-      const defaultStatusId = statusMap['To Do'] || Object.values(statusMap)[0];
-      const statusId = ticket.status && statusMap[ticket.status] 
-        ? statusMap[ticket.status]
-        : defaultStatusId;
-
-      if (!statusId) {
-        console.error('Aucun statut valide trouvé pour le ticket:', ticket.title);
-        return null;
-      }
-
-      // Créer le ticket avec les champs requis
-      const { data, error } = await supabaseAdmin.from('tickets').insert({
-        title: ticket.title,
-        description: ticket.description,
-        project_id: projectId,
-        status_id: statusId,
-        priority: ticket.priority || 2,
-        position: position,
-        parent_ticket_id: parentId,
-        is_sub_ticket: parentId !== null,
-        created_by: userId,  // Ajouter l'ID de l'utilisateur
-      }).select().single();
-
-      if (error) {
-        console.error('Erreur lors de la création du ticket:', error);
-        throw error;
-      }
-
-      return data;
-    };
-
-    // Traiter tous les tickets principaux
-    const createdTickets = [];
-    for (let i = 0; i < generatedTickets.length; i++) {
-      const ticket = generatedTickets[i];
-      try {
-        // Créer le ticket principal
-        const mainTicket = await createTicket(ticket, null, i);
+    // Pour chaque ticket principal (epic)
+    for (const ticket of generatedTickets) {
+      // Déterminer le statut
+      const statusId = statusMap[ticket.status] || statusMap['To Do'];
+      
+      // Créer le ticket principal
+      const { data: epicData, error: epicError } = await supabaseAdmin
+        .from('tickets')
+        .insert({
+          title: ticket.title,
+          description: ticket.description,
+          project_id: projectId,
+          status_id: statusId,
+          assigned_to: null,
+          created_by: userId,
+          priority: ticket.priority,
+          position: 0
+        })
+        .select();
         
-        if (mainTicket) {
-          // Traiter les sous-tickets si présents
-          if (ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0) {
-            for (let j = 0; j < ticket.subTickets.length; j++) {
-              const subTicket = ticket.subTickets[j];
-              // Assurer que le sous-ticket a le même statut que le ticket parent par défaut
-              if (!subTicket.status) {
-                subTicket.status = ticket.status || 'To Do';
-              }
-              await createTicket(subTicket, mainTicket.id, j);
-            }
-          }
+      if (epicError) {
+        console.error('Erreur lors de la création du ticket principal:', epicError);
+        continue;
+      }
+      
+      // Si le ticket principal a été créé et qu'il a des sous-tickets
+      if (epicData && epicData[0] && ticket.subTickets && ticket.subTickets.length > 0) {
+        const epicId = epicData[0].id;
+        
+        // Pour chaque sous-ticket
+        for (let i = 0; i < ticket.subTickets.length; i++) {
+          const subTicket = ticket.subTickets[i];
           
-          createdTickets.push(mainTicket);
+          // Déterminer le statut du sous-ticket
+          const subTicketStatusId = statusMap[subTicket.status] || statusMap['To Do'];
+          
+          // Créer le sous-ticket
+          const { error: subTicketError } = await supabaseAdmin
+            .from('tickets')
+            .insert({
+              title: subTicket.title,
+              description: subTicket.description,
+              project_id: projectId,
+              status_id: subTicketStatusId,
+              assigned_to: null,
+              created_by: userId,
+              priority: subTicket.priority,
+              position: i,
+              parent_ticket_id: epicId,
+              is_sub_ticket: true
+            });
+            
+          if (subTicketError) {
+            console.error('Erreur lors de la création du sous-ticket:', subTicketError);
+          }
         }
-      } catch (ticketError) {
-        console.error(`Erreur lors de la création du ticket ${i + 1}:`, ticketError);
-        // Continuer avec les autres tickets même si un échoue
       }
     }
-
-    console.log(`${createdTickets.length} tickets créés avec succès`);
-    return createdTickets.length > 0;
+    
+    return true
   } catch (error) {
     console.error("Erreur lors de la création des tickets dans la base de données:", error)
     return false
+  }
+}
+
+// Fonction pour générer un sous-ticket avec IA
+export async function generateSubTicketWithAI(
+  epicTitle: string,
+  epicDescription: string,
+  subTicketDescription: string
+): Promise<any> {
+  console.log("Génération de sous-ticket avec paramètres:", {
+    epicTitle,
+    epicDescription: epicDescription ? `${epicDescription.substring(0, 30)}...` : "(vide)",
+    subTicketDescription: `${subTicketDescription.substring(0, 30)}...`
+  });
+  
+  // Définir une longueur cible pour les descriptions de tickets
+  const TARGET_DESCRIPTION_LENGTH = 500;
+  // La limite maximale reste à 800 caractères
+  const MAX_DESCRIPTION_LENGTH = 800;
+  
+  const prompt = `
+    Je suis un assistant de gestion de projet et j'ai besoin de générer un sous-ticket technique pertinent 
+    pour l'epic suivant: "${epicTitle}". 
+    ${epicDescription ? `Description de l'epic: "${epicDescription}"` : ''}
+    
+    Voici la description du sous-ticket que je veux créer: "${subTicketDescription}"
+    
+    Génère un sous-ticket technique approprié au format JSON avec les champs suivants:
+    - title: Le titre doit suivre ce format exact: "Ticket [Num Epic].X (Domaine) : Description concise". 
+      Par exemple "Ticket 1.3 (Frontend) : Implémenter la validation de formulaire"
+    - description: Une description technique et actionnable avec des étapes précises
+    - priority: Un nombre entre 1 (basse) et 3 (haute) pour représenter la priorité du ticket
+    
+    IMPORTANT :
+    - Le titre DOIT respecter exactement le format spécifié
+    - La description DOIT être technique, précise et actionnable
+    - La description DOIT faire environ ${TARGET_DESCRIPTION_LENGTH} caractères (entre 450 et 550)
+    - La description NE DOIT JAMAIS dépasser ${MAX_DESCRIPTION_LENGTH} caractères
+    - Fournis uniquement le JSON demandé, sans aucun texte supplémentaire
+  `
+
+  try {
+    const response = await generateWithGemini(prompt)
+    
+    if (!response || response.trim() === '') {
+      console.error("Erreur: Réponse vide de Gemini");
+      return null;
+    }
+    
+    console.log("Réponse brute de Gemini:", response.substring(0, 100) + "...");
+    
+    // Analyser la réponse JSON
+    let jsonStr = response;
+    
+    // Si la réponse contient du texte avant ou après le JSON, tenter de l'extraire
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0];
+      console.log("JSON extrait:", jsonStr.substring(0, 100) + "...");
+    }
+    
+    // Tenter de parser le JSON
+    let ticketData;
+    try {
+      ticketData = JSON.parse(jsonStr);
+      console.log("Parsing JSON réussi");
+    } catch (parseError) {
+      console.error("Erreur de parsing JSON:", parseError);
+      
+      // Tentative de correction du JSON
+      try {
+        // Remplacer les guillemets simples par des guillemets doubles
+        const correctedJson = jsonStr.replace(/'/g, '"');
+        ticketData = JSON.parse(correctedJson);
+        console.log("Parsing JSON réussi après correction");
+      } catch (secondParseError) {
+        console.error("Échec de la correction du JSON:", secondParseError);
+        console.log("JSON incorrect:", jsonStr);
+        
+        // Créer un objet par défaut si le parsing échoue
+        ticketData = {
+          title: `Ticket X.X : ${subTicketDescription.substring(0, 50)}...`,
+          description: `Sous-ticket créé à partir de: ${subTicketDescription.substring(0, 400)}`,
+          priority: 2
+        };
+        console.log("Utilisation d'un objet par défaut");
+      }
+    }
+    
+    // Vérifier les champs requis
+    if (!ticketData.title) {
+      console.warn("Titre manquant dans la réponse, création d'un titre par défaut");
+      ticketData.title = `Ticket X.X : ${subTicketDescription.substring(0, 50)}...`;
+    }
+    
+    if (!ticketData.description) {
+      console.warn("Description manquante dans la réponse, création d'une description par défaut");
+      ticketData.description = `Sous-ticket créé à partir de: ${subTicketDescription.substring(0, 400)}`;
+    }
+    
+    // Extraire le numéro d'epic du titre
+    const epicNumberMatch = epicTitle.match(/EPIC\s+(\d+)/i);
+    const epicNumber = epicNumberMatch ? epicNumberMatch[1] : "X";
+    
+    // Formater correctement le titre
+    ticketData.title = ticketData.title.replace(/\[\d*\]\.X/i, `[${epicNumber}].X`);
+    
+    // S'assurer que le titre a un format correct
+    if (!ticketData.title.match(/Ticket\s+\[\w+\]\.X/i)) {
+      console.warn("Format de titre incorrect, correction");
+      ticketData.title = `Ticket [${epicNumber}].X : ${ticketData.title.substring(0, 50)}`;
+    }
+    
+    // Assurer les valeurs par défaut
+    ticketData.status = "To Do";
+    if (!ticketData.priority || ticketData.priority < 1 || ticketData.priority > 3) {
+      ticketData.priority = 2;
+    }
+    
+    // Vérifier la longueur de la description
+    if (ticketData.description.length > MAX_DESCRIPTION_LENGTH) {
+      console.log(`Description trop longue (${ticketData.description.length} caractères), troncature à ${MAX_DESCRIPTION_LENGTH}`);
+      ticketData.description = ticketData.description.substring(0, MAX_DESCRIPTION_LENGTH);
+    }
+    
+    // Ajouter une propriété de validation pour éviter les erreurs
+    ticketData.valid = true;
+    
+    console.log("Sous-ticket généré avec succès:", {
+      title: ticketData.title,
+      priority: ticketData.priority,
+      descriptionLength: ticketData.description.length
+    });
+    
+    return ticketData;
+  } catch (error) {
+    console.error("Erreur lors de la génération du sous-ticket:", error);
+    
+    // Créer un sous-ticket par défaut en cas d'erreur générale
+    const fallbackTicket = {
+      title: `Ticket X.X : ${subTicketDescription.substring(0, 50)}...`,
+      description: `Sous-ticket créé à partir de: ${subTicketDescription.substring(0, 400)}`,
+      priority: 2,
+      status: "To Do",
+      valid: true
+    };
+    
+    console.log("Utilisation d'un sous-ticket de secours suite à une erreur");
+    return fallbackTicket;
   }
 }
