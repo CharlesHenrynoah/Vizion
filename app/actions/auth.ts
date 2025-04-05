@@ -71,7 +71,7 @@ export async function signUp(email: string, password: string, fullName = ""): Pr
     const verificationToken = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("")
 
     // Insérer l'utilisateur
-    const result = await sql<User[]>`
+    const result = await sql`
       INSERT INTO users (
         email, 
         password_hash, 
@@ -113,7 +113,7 @@ export async function signUp(email: string, password: string, fullName = ""): Pr
     const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 
     // Stocker la session dans un cookie
-    cookies().set("session_id", sessionId, {
+    await cookies().set("session_id", sessionId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 7, // 1 semaine
@@ -121,7 +121,7 @@ export async function signUp(email: string, password: string, fullName = ""): Pr
     })
 
     // Stocker les informations utilisateur dans un cookie
-    cookies().set(
+    await cookies().set(
       "user_info",
       JSON.stringify({
         id: user.id,
@@ -148,7 +148,7 @@ export async function signUp(email: string, password: string, fullName = ""): Pr
     return {
       success: true,
       message: "Inscription réussie",
-      user,
+      user: user as User,
     }
   } catch (error) {
     console.error("Erreur lors de l'inscription:", error)
@@ -168,7 +168,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
     const passwordHash = hashPassword(password)
 
     // Rechercher l'utilisateur
-    const users = await sql<User[]>`
+    const users = await sql`
       SELECT 
         id, 
         email, 
@@ -203,7 +203,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
     const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 
     // Stocker la session dans un cookie
-    cookies().set("session_id", sessionId, {
+    await cookies().set("session_id", sessionId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 7, // 1 semaine
@@ -211,7 +211,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
     })
 
     // Stocker les informations utilisateur dans un cookie
-    cookies().set(
+    await cookies().set(
       "user_info",
       JSON.stringify({
         id: user.id,
@@ -238,7 +238,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
     return {
       success: true,
       message: "Connexion réussie",
-      user,
+      user: user as User,
     }
   } catch (error) {
     console.error("Erreur lors de la connexion:", error)
@@ -251,20 +251,20 @@ export async function signIn(email: string, password: string): Promise<AuthResul
 
 // Fonction pour se déconnecter
 export async function signOut() {
-  cookies().delete("session_id")
-  cookies().delete("user_info")
+  await cookies().delete("session_id")
+  await cookies().delete("user_info")
   redirect("/")
 }
 
 // Fonction pour vérifier si l'utilisateur est connecté
 export async function getSession(): Promise<{ isLoggedIn: boolean; user?: User }> {
-  const sessionId = cookies().get("session_id")?.value
+  const sessionId = await cookies().get("session_id")?.value
 
   if (!sessionId) {
     return { isLoggedIn: false }
   }
 
-  const userInfoCookie = cookies().get("user_info")?.value
+  const userInfoCookie = await cookies().get("user_info")?.value
 
   if (!userInfoCookie) {
     return { isLoggedIn: false }
@@ -281,7 +281,7 @@ export async function getSession(): Promise<{ isLoggedIn: boolean; user?: User }
     // Récupérer les informations utilisateur à jour depuis la base de données
     const sql = neon(process.env.DATABASE_URL!)
 
-    const users = await sql<User[]>`
+    const users = await sql`
       SELECT 
         id, 
         email, 
@@ -305,7 +305,7 @@ export async function getSession(): Promise<{ isLoggedIn: boolean; user?: User }
 
     return {
       isLoggedIn: true,
-      user: users[0],
+      user: users[0] as User,
     }
   } catch (error) {
     console.error("Erreur lors de la vérification de la session:", error)
@@ -360,12 +360,12 @@ export async function updateUserProfile(
     // Exécuter la requête de mise à jour
     await sql`
       UPDATE users
-      SET ${sql.raw(updateFields.join(", "))}
+      SET ${updateFields.join(", ")}
       WHERE id = ${userId}
     `
 
     // Récupérer l'utilisateur mis à jour
-    const users = await sql<User[]>`
+    const users = await sql`
       SELECT 
         id, 
         email, 
@@ -387,7 +387,7 @@ export async function updateUserProfile(
     }
 
     // Mettre à jour le cookie user_info
-    cookies().set(
+    await cookies().set(
       "user_info",
       JSON.stringify({
         id: users[0].id,
@@ -407,7 +407,7 @@ export async function updateUserProfile(
     return {
       success: true,
       message: "Profil mis à jour avec succès",
-      user: users[0],
+      user: users[0] as User,
     }
   } catch (error) {
     console.error("Erreur lors de la mise à jour du profil:", error)
@@ -516,7 +516,7 @@ export async function verifyEmail(token: string): Promise<AuthResult> {
     const sql = neon(process.env.DATABASE_URL!)
 
     // Vérifier si le token est valide
-    const users = await sql<User[]>`
+    const users = await sql`
       SELECT 
         id, 
         email, 
@@ -551,7 +551,7 @@ export async function verifyEmail(token: string): Promise<AuthResult> {
     return {
       success: true,
       message: "Email vérifié avec succès",
-      user: { ...users[0], email_verified: true },
+      user: { ...users[0], email_verified: true } as User,
     }
   } catch (error) {
     console.error("Erreur lors de la vérification de l'email:", error)
