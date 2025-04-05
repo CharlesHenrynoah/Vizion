@@ -3,6 +3,7 @@ import { generateSubTicketWithAI } from "@/app/actions/gemini-integration";
 import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { supabaseAdmin } from "@/lib/db";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 // Route pour générer un sous-ticket avec IA
 export async function POST(req: NextRequest) {
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
     console.log("Début du traitement de la requête API de création de sous-ticket");
     
     // Vérifier l'authentification
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user) {
       console.error("Erreur d'authentification: Utilisateur non authentifié");
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });

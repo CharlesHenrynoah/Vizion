@@ -917,7 +917,7 @@ export default function KanbanBoard({
                       className="space-y-2 min-h-[200px]"
                     >
                       {column.tickets.map((ticket, index) => (
-                        <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
+                        <Draggable key={String(ticket.id)} draggableId={String(ticket.id)} index={index}>
                           {(provided) => (
                             <Card
                               ref={provided.innerRef}
@@ -1004,8 +1004,8 @@ export default function KanbanBoard({
                                         >
                                           {ticket.subTickets && ticket.subTickets.map((subTicket, subIndex) => (
                                             <Draggable
-                                              key={subTicket.id}
-                                              draggableId={subTicket.id}
+                                              key={String(subTicket.id)}
+                                              draggableId={String(subTicket.id)}
                                               index={subIndex}
                                             >
                                               {(provided) => (
