@@ -246,11 +246,12 @@ declare module '@/components/ui/badge' {
 }
 
 declare module '@/components/ui/card' {
-  import { FC, ReactNode } from 'react';
+  import { FC, ReactNode, forwardRef, ForwardRefExoticComponent, RefAttributes } from 'react';
   
   export interface CardProps {
     className?: string;
     children?: ReactNode;
+    ref?: React.Ref<HTMLDivElement>;
   }
   
   export interface CardHeaderProps {
@@ -278,7 +279,7 @@ declare module '@/components/ui/card' {
     children?: ReactNode;
   }
   
-  export const Card: FC<CardProps>;
+  export const Card: ForwardRefExoticComponent<CardProps & RefAttributes<HTMLDivElement>>;
   export const CardHeader: FC<CardHeaderProps>;
   export const CardTitle: FC<CardTitleProps>;
   export const CardDescription: FC<CardDescriptionProps>;

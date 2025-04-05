@@ -1056,7 +1056,7 @@ export default function KanbanBoard({
                                               )}
                                             </Draggable>
                                           ))}
-                                          {provided.placeholder}
+                                          {provided.placeholder as React.ReactNode}
                                         </div>
                                       )}
                                     </Droppable>
@@ -1087,7 +1087,7 @@ export default function KanbanBoard({
                           )}
                         </Draggable>
                       ))}
-                      {provided.placeholder}
+                      {provided.placeholder as React.ReactNode}
                     </div>
                   )}
                 </Droppable>
